@@ -405,6 +405,7 @@ pub struct WebHost {
     shown: bool,
     /// The holes cut in the view (`set_holes`), in the view's own
     /// coordinates, as last applied.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     holes: Vec<(f64, f64, f64, f64)>,
     /// A page from a buffer: the buffer version shown, and the directory
     /// its relative links resolve in.
@@ -435,12 +436,19 @@ pub struct WebHost {
     toc: Option<Toc>,
     /// The veil laid over the page while a dialog has the window (`set_veil`):
     /// its colour, and the layer that draws it.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     veil: Option<(u32, VeilLayer)>,
 }
 
 /// A CALayer over a page, retained while it is there.
+#[cfg(target_os = "macos")]
 pub struct VeilLayer(*mut objc::runtime::Object);
 
+/// No veil is laid elsewhere (`set_veil`), so nothing to keep.
+#[cfg(not(target_os = "macos"))]
+pub struct VeilLayer(());
+
+#[cfg(target_os = "macos")]
 impl Drop for VeilLayer {
     fn drop(&mut self) {
         #[cfg(target_os = "macos")]
@@ -1052,6 +1060,11 @@ impl Webs {
     }
 
     fn build(&mut self, w: WindowId, page: Page, bounds: Bounds<Pixels>, window: &Window, visible: bool) {
+        #[cfg(target_os = "linux")]
+        if !gtk::is_initialized() {
+            eprintln!("web: {w}: no page without gtk");
+            return;
+        }
         let rect = Self::rect(bounds);
         let watches: Arc<Mutex<HashMap<String, u32>>> = Arc::new(Mutex::new(HashMap::new()));
         let (tx1, tx2, tx3, tx4) = (self.tx.clone(), self.tx.clone(), self.tx.clone(), self.tx.clone());
@@ -1684,6 +1697,41 @@ pub fn focus_ui(window: &Window) {
 
 #[cfg(not(target_os = "macos"))]
 pub fn focus_ui(_window: &Window) {}
+
+/// What the pages' toolkit needs before the first page: GTK initialised
+/// on the main thread (wry panics otherwise). Whether it is; a page is
+/// not made without it.
+#[cfg(target_os = "linux")]
+pub fn platform_init() -> bool {
+    match gtk::init() {
+        Ok(()) => true,
+        Err(e) => {
+            eprintln!("apex-ui: no pages: gtk: {e}");
+            false
+        }
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn platform_init() -> bool {
+    true
+}
+
+/// GTK's loop turned, as often as the tick comes round: WebKitGTK's
+/// views are drawn and hear their events from it, and gpui runs its own
+/// loop, not GTK's.
+#[cfg(target_os = "linux")]
+pub fn pump() {
+    if !gtk::is_initialized() {
+        return;
+    }
+    while gtk::events_pending() {
+        gtk::main_iteration_do(false);
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn pump() {}
 
 /// Whether ⌘ and control are down now, asked of the system rather than
 /// of the events gpui was sent: a page that had the keys hears a

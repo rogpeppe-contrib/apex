@@ -354,8 +354,20 @@ pub fn adopt_login_shell_environment() -> Vec<String> {
 // ---- which sessions to open ----------------------------------------------------------
 
 pub(crate) fn state_file() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/".into());
-    PathBuf::from(home).join("Library/Application Support/apex/last-sessions")
+    state_dir().join("last-sessions")
+}
+
+/// Where the app keeps what it remembers between runs: the Mac's
+/// Application Support, elsewhere `$XDG_STATE_HOME` (`~/.local/state`).
+pub(crate) fn state_dir() -> PathBuf {
+    let home = || std::env::var("HOME").unwrap_or_else(|_| "/".into());
+    if cfg!(target_os = "macos") {
+        return PathBuf::from(home()).join("Library/Application Support/apex");
+    }
+    match std::env::var("XDG_STATE_HOME") {
+        Ok(d) if !d.is_empty() => PathBuf::from(d).join("apex"),
+        _ => PathBuf::from(home()).join(".local/state/apex"),
+    }
 }
 
 /// A window as remembered: its session, and where it was on screen.
@@ -473,6 +485,7 @@ pub fn reopen_refused() -> Option<String> {
 }
 
 /// `ApplePersistenceIgnoreState`, as AppKit reads it.
+#[cfg(target_os = "macos")]
 fn persistence_ignored() -> bool {
     use objc::runtime::{Object, BOOL, YES};
     use objc::{class, msg_send, sel, sel_impl};
@@ -487,6 +500,12 @@ fn persistence_ignored() -> bool {
         let on: BOOL = msg_send![defaults, boolForKey: key];
         on == YES
     }
+}
+
+/// No AppKit to ask.
+#[cfg(not(target_os = "macos"))]
+fn persistence_ignored() -> bool {
+    false
 }
 
 /// A launch begun: the marker says so until it has settled.
@@ -559,6 +578,7 @@ pub fn ensure_daemon(socket: &Path) -> std::io::Result<()> {
 // ---- the apex command ---------------------------------------------------------------
 
 /// Where the `apex` command gets linked.
+#[cfg(target_os = "macos")]
 pub const CLI_LINK: &str = "/usr/local/bin/apex";
 
 /// The `apex` command this app carries: the one beside the executable
@@ -592,6 +612,7 @@ pub fn link_cli(target: &Path, link: &Path) -> std::io::Result<()> {
 
 /// Install the command, asking for administrator rights through the
 /// system dialog when `/usr/local/bin` is not ours to write.
+#[cfg(target_os = "macos")]
 pub fn install_cli() -> Result<String, String> {
     let target = bundled_cli().map_err(|e| e.to_string())?;
     let link = Path::new(CLI_LINK);
@@ -618,6 +639,17 @@ pub fn install_cli() -> Result<String, String> {
             Err(format!("could not link {}: {}", link.display(), err.trim()))
         }
     }
+}
+
+/// Install the command: a link in `~/.local/bin`, which is the user's own
+/// to write and on the path of most distributions' login shells.
+#[cfg(not(target_os = "macos"))]
+pub fn install_cli() -> Result<String, String> {
+    let target = bundled_cli().map_err(|e| e.to_string())?;
+    let home = std::env::var("HOME").map_err(|_| "no HOME".to_string())?;
+    let link = PathBuf::from(home).join(".local/bin/apex");
+    link_cli(&target, &link).map_err(|e| format!("{}: {e}", link.display()))?;
+    Ok(format!("{} → {}", link.display(), target.display()))
 }
 
 #[cfg(test)]

@@ -14,6 +14,8 @@
 mod app;
 mod attention;
 mod contrast;
+// the Mac's pointers are AppKit's; elsewhere, the system's own
+#[cfg_attr(not(target_os = "macos"), path = "cursor_other.rs")]
 mod cursor;
 mod field;
 mod fonts;
@@ -721,7 +723,8 @@ fn main() {
     gpui_platform::application().run(move |cx: &mut App| {
         attention::dock_icon();
         cursor::install();
-        text_element::install_symbols();
+        web::platform_init();
+        text_element::install_symbols(cx);
         fonts::load();
         fonts::install(cx);
         pool::Pool::install(cx);
@@ -922,6 +925,9 @@ fn open_window(cx: &mut App, target: Target, frame: Option<WindowBounds>) -> Opt
             // window move (a tab dragged reorders the tabs); the strip's
             // own handler moves the window (`start_window_move`)
             app_owns_titlebar_drag: true,
+            // the desktop's name for the window's kind (X11's WM_CLASS,
+            // Wayland's app id): what its launcher entry and icon go by
+            app_id: Some("apex-ui".into()),
             ..Default::default()
         },
         move |window, cx| {

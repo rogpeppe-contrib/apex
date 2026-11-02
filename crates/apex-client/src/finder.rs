@@ -137,8 +137,7 @@ pub fn score(query: &str, path: &str) -> Option<f64> {
 // ---- the closed files, per session, on this machine ------------------------
 
 fn closed_file() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/".into());
-    PathBuf::from(home).join("Library/Application Support/apex/recent-files")
+    crate::shell::state_dir().join("recent-files")
 }
 
 /// The files closed lately in `url`'s session, latest first.

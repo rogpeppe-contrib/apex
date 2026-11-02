@@ -16,13 +16,23 @@ apex-edit = { path = "../apex-edit" }
 gpui = { git = "https://github.com/zed-industries/zed", branch = "main" }
 gpui_platform = { git = "https://github.com/zed-industries/zed", branch = "main", features = ["runtime_shaders", "font-kit"] }
 futures = "0.3"
+# web windows: a native web view as a child of the gpui window (WEB.md §2)
+wry = "0.56"
+flate2 = "1"
+raw-window-handle = "0.6"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# gpui's Linux backends: both, chosen by what the session offers
+gpui_platform = { git = "https://github.com/zed-industries/zed", branch = "main", features = ["runtime_shaders", "font-kit", "wayland", "x11"] }
+# wry's pages are WebKitGTK's, which need GTK initialised and its loop
+# turned (`web::pump`)
+gtk = "0.18"
+
+[target.'cfg(target_os = "macos")'.dependencies]
 core-text = "21"
 objc = "0.2"
 block2 = "0.6"
-# web windows: a native web view as a child of the gpui window (WEB.md §2)
 wry = { version = "0.56", features = ["mac-proxy"] }
-flate2 = "1"
-raw-window-handle = "0.6"
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 # Avoid pathfinder_simd's broken nightly-only aarch64 SIMD backend.

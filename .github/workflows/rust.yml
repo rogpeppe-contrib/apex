@@ -16,6 +16,21 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    # the GUI client: gpui's X11 and Wayland backends, and wry's WebKitGTK
+    - name: Install system libraries
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libxkbcommon-dev libwayland-dev libx11-dev libxcb1-dev libvulkan-dev libfontconfig-dev libssl-dev
+    # libghostty-vt is built from source with Zig (crates/ghostty-vt-sys)
+    - name: Install Zig
+      run: |
+        curl -sSL https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz | tar xJ -C "$HOME"
+        echo "ZIG=$HOME/zig-x86_64-linux-0.16.0/zig" >> "$GITHUB_ENV"
+    - name: Cache the built libghostty-vt
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/apex
+        key: ghostty-${{ hashFiles('crates/ghostty-vt-sys/build.rs') }}
     - name: Build
       run: cargo build --verbose
     - name: Run tests

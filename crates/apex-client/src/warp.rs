@@ -4,6 +4,7 @@
 
 use gpui::{Pixels, Point, Window};
 
+#[cfg(target_os = "macos")]
 #[repr(C)]
 #[derive(Clone, Copy)]
 struct CGPoint {
@@ -27,6 +28,7 @@ struct CGRect {
     size: CGSize,
 }
 
+#[cfg(target_os = "macos")]
 #[link(name = "CoreGraphics", kind = "framework")]
 extern "C" {
     fn CGWarpMouseCursorPosition(p: CGPoint) -> i32;
@@ -34,6 +36,7 @@ extern "C" {
 }
 
 /// Put the pointer at `p`, a point in this window's coordinates.
+#[cfg(target_os = "macos")]
 pub fn move_to(window: &Window, p: Point<Pixels>) {
     let p = screen_point(window, p);
     // SAFETY: plain CoreGraphics calls with a by-value point.
@@ -96,16 +99,14 @@ fn screen_point(window: &Window, p: Point<Pixels>) -> CGPoint {
     }
 }
 
+/// Not yet: X11 can warp the pointer (`XWarpPointer`), Wayland will not,
+/// and gpui offers neither. The pointer stays where it was and the app's
+/// memory of where it put it goes unmet.
 #[cfg(not(target_os = "macos"))]
-fn screen_point(window: &Window, p: Point<Pixels>) -> CGPoint {
-    let b = window.bounds();
-    CGPoint {
-        x: f32::from(b.origin.x + p.x) as f64,
-        y: f32::from(b.origin.y + p.y) as f64,
-    }
-}
+pub fn move_to(_window: &Window, _p: Point<Pixels>) {}
 
 /// The pointer shown, where it is: AppKit's typing-hides-it undone.
+#[cfg(target_os = "macos")]
 pub fn show() {
     use objc::{class, msg_send, sel, sel_impl};
     // SAFETY: a class method on NSCursor, on the main thread.

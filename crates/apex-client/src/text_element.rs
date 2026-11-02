@@ -613,7 +613,8 @@ pub const SYMBOLS: &str = "Symbols Nerd Font Mono";
 /// fallback is named to CoreText, which resolves the cascade list, and
 /// because gpui will not load a family with no `m` in it -- which a font
 /// of symbols has no business having.
-pub fn install_symbols() {
+#[cfg(target_os = "macos")]
+pub fn install_symbols(_cx: &mut gpui::App) {
     const TTF: &[u8] = include_bytes!("../assets/SymbolsNerdFontMono-Regular.ttf");
     // SAFETY: the bytes are static, so the provider needs no release
     // callback and may outlive this call; the font and the provider are
@@ -642,12 +643,25 @@ pub fn install_symbols() {
     }
 }
 
+/// The symbols font to gpui's own font source, which is the only one
+/// here: fallbacks are resolved from it, and it takes a family of
+/// symbols as it takes any other.
+#[cfg(not(target_os = "macos"))]
+pub fn install_symbols(cx: &mut gpui::App) {
+    const TTF: &[u8] = include_bytes!("../assets/SymbolsNerdFontMono-Regular.ttf");
+    if let Err(e) = cx.text_system().add_fonts(vec![std::borrow::Cow::Borrowed(TTF)]) {
+        eprintln!("apex-ui: the symbols font: {e}");
+    }
+}
+
+#[cfg(target_os = "macos")]
 #[link(name = "CoreGraphics", kind = "framework")]
 extern "C" {
     fn CGDataProviderCreateWithData(info: *mut std::ffi::c_void, data: *const std::ffi::c_void, size: usize, release: *const std::ffi::c_void) -> *const std::ffi::c_void;
     fn CGFontCreateWithDataProvider(provider: *const std::ffi::c_void) -> *const std::ffi::c_void;
 }
 
+#[cfg(target_os = "macos")]
 #[link(name = "CoreText", kind = "framework")]
 extern "C" {
     /// Registers a font with CoreText for this process, as a font in an
@@ -655,6 +669,7 @@ extern "C" {
     fn CTFontManagerRegisterGraphicsFont(font: *const std::ffi::c_void, error: *mut *const std::ffi::c_void) -> bool;
 }
 
+#[cfg(target_os = "macos")]
 #[link(name = "CoreFoundation", kind = "framework")]
 extern "C" {
     fn CFRelease(v: *const std::ffi::c_void);
@@ -709,33 +724,43 @@ fn zero_for(window: &Window, id: FontId) -> Option<(GlyphId, GlyphId)> {
     if let Some(z) = ZEROS.with(|m| m.borrow().get(&id).copied()) {
         return z;
     }
-    let z = (|| {
-        let font = window.text_system().get_font_for_id(id)?;
-        // the system's faces have their slashed zero as a feature
-        // (`zero`, set in `unjoined`), and CoreText will not open them by
-        // name
-        if font.family.starts_with('.') {
-            return None;
-        }
-        let ct = core_text::font::new_from_name(&font.family, 12.).ok()?;
-        let slashed = ct.get_glyph_with_name("zeroslash");
-        if slashed == 0 {
-            return None;
-        }
-        let mut zero: u16 = 0;
-        let ch: u16 = '0' as u16;
-        // SAFETY: one character in, one glyph out, both on the stack
-        let found = unsafe { ct.get_glyphs_for_characters(&ch, &mut zero, 1) };
-        if !found || zero == 0 {
-            return None;
-        }
-        // SAFETY: gpui::GlyphId is `#[repr(C)] struct GlyphId(u32)` with a
-        // crate-private field and no public constructor.
-        let glyph = |g: u16| unsafe { std::mem::transmute::<u32, GlyphId>(g as u32) };
-        Some((glyph(zero), glyph(slashed)))
-    })();
+    let z = slashed_zero(window, id);
     ZEROS.with(|m| m.borrow_mut().insert(id, z));
     z
+}
+
+/// Font `id`'s zero and its slashed zero by name, asked of CoreText.
+#[cfg(target_os = "macos")]
+fn slashed_zero(window: &Window, id: FontId) -> Option<(GlyphId, GlyphId)> {
+    let font = window.text_system().get_font_for_id(id)?;
+    // the system's faces have their slashed zero as a feature
+    // (`zero`, set in `unjoined`), and CoreText will not open them by
+    // name
+    if font.family.starts_with('.') {
+        return None;
+    }
+    let ct = core_text::font::new_from_name(&font.family, 12.).ok()?;
+    let slashed = ct.get_glyph_with_name("zeroslash");
+    if slashed == 0 {
+        return None;
+    }
+    let mut zero: u16 = 0;
+    let ch: u16 = '0' as u16;
+    // SAFETY: one character in, one glyph out, both on the stack
+    let found = unsafe { ct.get_glyphs_for_characters(&ch, &mut zero, 1) };
+    if !found || zero == 0 {
+        return None;
+    }
+    // SAFETY: gpui::GlyphId is `#[repr(C)] struct GlyphId(u32)` with a
+    // crate-private field and no public constructor.
+    let glyph = |g: u16| unsafe { std::mem::transmute::<u32, GlyphId>(g as u32) };
+    Some((glyph(zero), glyph(slashed)))
+}
+
+/// Only Lucida Grande has the glyph, and only the Mac has Lucida Grande.
+#[cfg(not(target_os = "macos"))]
+fn slashed_zero(_window: &Window, _id: FontId) -> Option<(GlyphId, GlyphId)> {
+    None
 }
 
 /// Paint a shaped (possibly wrapped) line glyph by glyph, like gpui's own
@@ -1546,7 +1571,7 @@ fn shape(
     // an icon's cell: an em space in a face whose em space is an em (a
     // face's own may be narrower, or missing -- Styrene's -- and the
     // icons then stood on one another)
-    let cell_face = Font { family: ".SystemUIFont".into(), ..fontspec.font.clone() };
+    let cell_face = Font { family: crate::fonts::SYSTEM_UI.into(), ..fontspec.font.clone() };
     let mut info = LineInfo {
         start,
         end,

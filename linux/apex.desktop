@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Apex
+Comment=A modernized acme: text first, mouse oriented, with plumbing everywhere
+Exec=apex-ui %F
+Icon=apex
+Terminal=false
+Categories=Development;TextEditor;
+MimeType=text/plain;text/markdown;text/x-go;text/x-rust;text/x-csrc;text/x-shellscript;
+StartupNotify=true
+StartupWMClass=apex-ui

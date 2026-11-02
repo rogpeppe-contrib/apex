@@ -1707,6 +1707,7 @@ impl Acme {
             let alive = cx.update(|cx| {
                 let mine = this.entity_id();
                 let mut alive = false;
+                crate::web::pump();
                 for h in cx.windows() {
                     if let Some(h) = h.downcast::<Acme>() {
                         let _ = h.update(cx, |acme, window, cx| {
@@ -4573,7 +4574,7 @@ impl Acme {
         }
         if (url.starts_with("http://") || url.starts_with("https://")) && apex_server::plane::alias_loopback_url(&url) == url {
             crate::shell::log_line(&format!("link {url}: the system's browser"));
-            if let Err(e) = std::process::Command::new("/usr/bin/open").arg(&url).spawn() {
+            if let Err(e) = spawn_quiet(OPEN, &[&url]) {
                 self.notice(&format!("open {url}: {e}\n"));
             }
         } else {
@@ -4645,7 +4646,7 @@ impl Acme {
                 perform(&mut self.node, &mut self.log, vec![Proposal::Navigate { window: w, url: to }]);
                 self.after();
             } else if self.node.is_url_page(w) {
-                if let Err(e) = std::process::Command::new("/usr/bin/open").arg(&to).spawn() {
+                if let Err(e) = spawn_quiet(OPEN, &[&to]) {
                     self.notice(&format!("open {to}: {e}\n"));
                 }
             } else {
@@ -5653,6 +5654,9 @@ impl Acme {
 }
 
 /// Run a program detached, for something the platform shows.
+/// The desktop's opener: a URL or file to whatever handles it.
+const OPEN: &str = if cfg!(target_os = "macos") { "open" } else { "xdg-open" };
+
 fn spawn_quiet(prog: &str, args: &[&str]) -> Result<std::process::Child, String> {
     std::process::Command::new(prog)
         .args(args)
@@ -5675,7 +5679,7 @@ pub struct Live {
 
 pub fn client_do(verb: &str, args: &str) -> Result<(), String> {
     match verb {
-        "open" => spawn_quiet(if cfg!(target_os = "macos") { "open" } else { "xdg-open" }, &[args]).map(|_| ()),
+        "open" => spawn_quiet(OPEN, &[args]).map(|_| ()),
         "preview" => open_preview(None, Path::new(args)).map(|_| ()),
         _ => Err(format!("apex-ui cannot {verb}")),
     }

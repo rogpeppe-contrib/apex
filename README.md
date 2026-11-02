@@ -26,6 +26,15 @@ Apex is written in Rust using [GPUI](https://gpui.rs). To build the app:
 This produces `target/Apex.app`. Once it is running, *Apex ▸ Install apex
 Command…* puts `apex` on your path.
 
+On Linux (X11; Wayland is untried), with Zig 0.16 and the GTK and
+WebKitGTK development packages installed (on Ubuntu,
+`libwebkit2gtk-4.1-dev libgtk-3-dev`):
+
+    % linux/build.sh --install
+
+puts `apex-ui`, `apex` and `rc` in `~/.local/bin`, and a desktop entry
+and icon under `~/.local/share`.
+
 ## Further reading
 
 - [DESIGN.md](DESIGN.md) describes how Apex is built, and why.

@@ -186,18 +186,38 @@ pub fn text() -> Spec {
 
 fn text_as_set() -> Spec {
     match current() {
-        Set::System => Spec { family: ".SystemUIFont", size: px(14.), line_height: px(20.), weight: FontWeight::NORMAL, features: LEGIBLE },
-        Set::Classic => Spec { family: "Lucida Grande", size: px(13.), line_height: px(17.), weight: FontWeight::NORMAL, features: &[] },
+        Set::System => Spec { family: SYSTEM_TEXT, size: px(14.), line_height: px(20.), weight: FontWeight::NORMAL, features: LEGIBLE },
+        Set::Classic => Spec { family: LUCIDA, size: px(13.), line_height: px(17.), weight: FontWeight::NORMAL, features: &[] },
         Set::Go => Spec { family: "Go", size: px(14.), line_height: px(20.), weight: FontWeight::NORMAL, features: &[] },
         Set::Mona => Spec { family: "Mona Sans", size: px(15.), line_height: px(21.), weight: FontWeight::NORMAL, features: &[] },
-        Set::Nova => Spec { family: ".SystemUIFont", size: px(14.), line_height: px(20.), weight: FontWeight::NORMAL, features: LEGIBLE },
+        Set::Nova => Spec { family: SYSTEM_TEXT, size: px(14.), line_height: px(20.), weight: FontWeight::NORMAL, features: LEGIBLE },
         Set::Hco => Spec { family: IDEAL, size: px(14.), line_height: px(20.), weight: FontWeight::NORMAL, features: &[] },
         Set::Inter => Spec { family: "Inter", size: px(14.), line_height: px(20.), weight: FontWeight::NORMAL, features: &[] },
         Set::Geist => Spec { family: "Geist", size: px(14.), line_height: px(20.), weight: FontWeight::NORMAL, features: &[] },
         Set::Styrene => Spec { family: STYRENE, size: px(14.), line_height: px(20.), weight: FontWeight::NORMAL, features: &[] },
-        Set::Lucida => Spec { family: "Lucida Grande", size: px(13.), line_height: px(17.), weight: FontWeight::NORMAL, features: &[] },
+        Set::Lucida => Spec { family: LUCIDA, size: px(13.), line_height: px(17.), weight: FontWeight::NORMAL, features: &[] },
     }
 }
+
+/// The Mac's own faces, and what stands in for each elsewhere: the
+/// bundled Inter for SF Pro and Lucida Grande, JetBrains Mono for Menlo
+/// (as rsms pairs them), so that every set names a face that is there.
+#[cfg(target_os = "macos")]
+pub const SYSTEM_TEXT: &str = ".SystemUIFont";
+#[cfg(target_os = "macos")]
+pub const SYSTEM_UI: &str = ".AppleSystemUIFont";
+#[cfg(target_os = "macos")]
+const LUCIDA: &str = "Lucida Grande";
+#[cfg(target_os = "macos")]
+const MENLO: &str = "Menlo";
+#[cfg(not(target_os = "macos"))]
+pub const SYSTEM_TEXT: &str = "Inter";
+#[cfg(not(target_os = "macos"))]
+pub const SYSTEM_UI: &str = "Inter";
+#[cfg(not(target_os = "macos"))]
+const LUCIDA: &str = "Inter";
+#[cfg(not(target_os = "macos"))]
+const MENLO: &str = "JetBrains Mono";
 
 /// The weight to ask for to get `w`: what it is, but for H&Co's faces,
 /// whose weights are drawn together as a typographic family's are --
@@ -239,19 +259,19 @@ fn mono_as_set() -> Spec {
             } else if SF_NS_MONO.load(Ordering::Relaxed) {
                 ".SF NS Mono"
             } else {
-                "Menlo"
+                MENLO
             };
             Spec { family, size: px(12.), line_height: px(16.), weight: FontWeight::MEDIUM, features: &[] }
         }
-        Set::Classic => Spec { family: "Menlo", size: px(12.), line_height: px(16.), weight: FontWeight::NORMAL, features: &[] },
+        Set::Classic => Spec { family: MENLO, size: px(12.), line_height: px(16.), weight: FontWeight::NORMAL, features: &[] },
         Set::Go => Spec { family: "Go Mono", size: px(12.), line_height: px(16.), weight: FontWeight::NORMAL, features: &[] },
         Set::Mona => Spec { family: "Monaspace Xenon", size: px(12.), line_height: px(16.), weight: FontWeight::NORMAL, features: XENON },
-        Set::Nova => Spec { family: "Menlo", size: px(12.), line_height: px(16.), weight: FontWeight::NORMAL, features: &[] },
+        Set::Nova => Spec { family: MENLO, size: px(12.), line_height: px(16.), weight: FontWeight::NORMAL, features: &[] },
         Set::Hco => Spec { family: OPERATOR, size: px(12.), line_height: px(16.), weight: FontWeight::NORMAL, features: &[] },
         Set::Inter | Set::Styrene => Spec { family: "JetBrains Mono", size: px(12.), line_height: px(16.), weight: FontWeight::NORMAL, features: &[] },
         Set::Geist => Spec { family: "Geist Mono", size: px(12.), line_height: px(16.), weight: FontWeight::NORMAL, features: &[] },
         Set::Lucida => {
-            let family = LUCIDA_MONO.get().map(String::as_str).unwrap_or("Menlo");
+            let family = LUCIDA_MONO.get().map(String::as_str).unwrap_or(MENLO);
             Spec { family, size: px(12.), line_height: px(16.), weight: FontWeight::NORMAL, features: &[] }
         }
     }
@@ -260,16 +280,16 @@ fn mono_as_set() -> Spec {
 /// What the sidebar, sheets and menus are set in.
 pub fn ui() -> &'static str {
     match current() {
-        Set::System => ".AppleSystemUIFont",
-        Set::Classic => "Lucida Grande",
+        Set::System => SYSTEM_UI,
+        Set::Classic => LUCIDA,
         Set::Go => "Go",
         Set::Mona => "Mona Sans",
-        Set::Nova => ".AppleSystemUIFont",
+        Set::Nova => SYSTEM_UI,
         Set::Hco => IDEAL,
         Set::Inter => "Inter",
         Set::Geist => "Geist",
         Set::Styrene => STYRENE,
-        Set::Lucida => "Lucida Grande",
+        Set::Lucida => LUCIDA,
     }
 }
 

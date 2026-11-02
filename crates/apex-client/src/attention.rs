@@ -14,7 +14,9 @@
 use std::collections::HashSet;
 
 use gpui::{App, Global};
+#[cfg(target_os = "macos")]
 use objc::runtime::Object;
+#[cfg(target_os = "macos")]
 use objc::{class, msg_send, sel, sel_impl};
 
 use apex_core::{Seq, WindowId};
@@ -119,12 +121,14 @@ pub fn queue(cx: &App) -> Vec<Note> {
 }
 
 /// The space bunny, the sticker's own shape on nothing (`mac/space-bunny-1024.png`).
+#[cfg(target_os = "macos")]
 const ICON: &[u8] = include_bytes!("../../../mac/space-bunny-1024.png");
 
 /// The Dock's icon, set as the app runs: the sticker's own outline, with
 /// no square round it. (The bundle's icon, shown while it does not run,
 /// is the sticker on a navy square, `mac/apex.icon`: since macOS 26 a
 /// bundle's icon is a rounded square whatever it is drawn as.)
+#[cfg(target_os = "macos")]
 pub fn dock_icon() {
     // SAFETY: AppKit on the main thread, at launch; the data is copied.
     unsafe {
@@ -139,7 +143,12 @@ pub fn dock_icon() {
     }
 }
 
+/// Elsewhere the icon is the desktop's affair, from the `.desktop` file.
+#[cfg(not(target_os = "macos"))]
+pub fn dock_icon() {}
+
 /// `-[NSApplication requestUserAttention:]`, informational: one bounce.
+#[cfg(target_os = "macos")]
 fn bounce() {
     const NS_INFORMATIONAL_REQUEST: isize = 10;
     unsafe {
@@ -148,8 +157,14 @@ fn bounce() {
     }
 }
 
+/// No Dock to bounce in: nothing, until a window's urgency hint is asked
+/// of gpui.
+#[cfg(not(target_os = "macos"))]
+fn bounce() {}
+
 /// The SF Symbol a status's mark is drawn with on the Dock icon, on its
 /// disc: as the app's own icons say it in a tag (`status_icon`).
+#[cfg(target_os = "macos")]
 fn symbol(state: apex_core::status::State, kind: Option<apex_core::status::Kind>) -> &'static str {
     use apex_core::status::{Kind, State};
     match (state, kind) {
@@ -161,6 +176,7 @@ fn symbol(state: apex_core::status::State, kind: Option<apex_core::status::Kind>
     }
 }
 
+#[cfg(target_os = "macos")]
 #[repr(C)]
 #[derive(Clone, Copy)]
 struct Point {
@@ -168,6 +184,7 @@ struct Point {
     y: f64,
 }
 
+#[cfg(target_os = "macos")]
 #[repr(C)]
 #[derive(Clone, Copy)]
 struct Rect {
@@ -179,6 +196,7 @@ struct Rect {
 /// icon as it is): over the bunny's top right, on a disc ringed in white,
 /// a blue dot -- or, its status asking for the user, its symbol, white
 /// on the stale gold.
+#[cfg(target_os = "macos")]
 fn badge(mark: Option<Mark>) {
     let Some(mark) = mark else {
         dock_icon();
@@ -203,8 +221,13 @@ fn badge(mark: Option<Mark>) {
     }
 }
 
+/// No icon to mark.
+#[cfg(not(target_os = "macos"))]
+fn badge(_mark: Option<Mark>) {}
+
 /// The Dock icon with `mark` over it (`badge`), in the theme's `accent`
 /// and `stale`: an image of the caller's to release, or nil.
+#[cfg(target_os = "macos")]
 fn marked(mark: Mark, accent: u32, stale: u32) -> *mut Object {
     let color = |rgb: u32| -> *mut Object {
         let c = |s: u32| f64::from((rgb >> s) & 0xff) / 255.;
@@ -270,11 +293,21 @@ fn marked(mark: Mark, accent: u32, stale: u32) -> *mut Object {
 }
 
 /// The beep a Mac makes when there is nowhere to go (`NSBeep`).
+#[cfg(target_os = "macos")]
 pub fn beep() {
     // SAFETY: a plain AppKit function of no arguments.
     unsafe { NSBeep() }
 }
 
+/// The terminal's bell, for want of the Mac's: what the desktop makes of
+/// a BEL on stdout, which is often nothing.
+#[cfg(not(target_os = "macos"))]
+pub fn beep() {
+    use std::io::Write;
+    let _ = std::io::stdout().write_all(b"\x07").and_then(|()| std::io::stdout().flush());
+}
+
+#[cfg(target_os = "macos")]
 #[link(name = "AppKit", kind = "framework")]
 extern "C" {
     fn NSBeep();
@@ -290,6 +323,7 @@ mod tests {
 
     /// The Dock icon with each mark, written as PNGs to $APEX_DOCK_OUT,
     /// to be looked at.
+    #[cfg(target_os = "macos")]
     #[test]
     #[ignore]
     fn the_dock_icons_marks_drawn() {
