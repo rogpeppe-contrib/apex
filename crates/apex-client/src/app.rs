@@ -503,6 +503,10 @@ pub struct Acme {
     pub title_marks: std::rc::Rc<std::cell::RefCell<crate::titlefit::Marks>>,
     pub title_fan: Option<crate::titlefit::Fan>,
     pub session_menu: bool,
+    /// Off the Mac, the menu bar's menus dropped down from the title
+    /// bar's button (`appmenu.rs`): the submenus open, by their index in
+    /// each menu down the cascade.
+    pub app_menu: Option<Vec<usize>>,
     /// Every known host and its sessions, for the sidebar: as last seen,
     /// then as each host answers (`sidebar_refresh`), and when it was
     /// last asked.
@@ -1612,7 +1616,7 @@ impl Acme {
     /// error, and for a daemon of another build, how to get going again.
     pub fn connect_error(url: &SessionUrl, e: &std::io::Error) -> String {
         if e.kind() == std::io::ErrorKind::Unsupported {
-            format!("{}: {e}: Reconnect (⌘⇧R)\n", url.describe())
+            format!("{}: {e}: Reconnect ({})\n", url.describe(), crate::shell::keys("⌘⇧R"))
         } else {
             format!("{}: {e}\n", url.describe())
         }
@@ -1821,6 +1825,7 @@ impl Acme {
             title_marks: crate::titlefit::new_marks(),
             title_fan: None,
             session_menu: false,
+            app_menu: None,
             sidebar_hosts: Vec::new(),
             sidebar_asked: None,
             commands: None,
@@ -3373,6 +3378,7 @@ impl Acme {
         self.url_edit = None;
         self.session_edit = None;
         self.session_menu = false;
+        self.app_menu = None;
         // and one off a tag's field or the path's picker puts it away
         self.tag_edit = None;
         self.picker_due = None;
@@ -4456,7 +4462,7 @@ impl Acme {
     fn overlay_up(&self) -> bool {
         // an address being typed keeps the keys from the pages too
         // and a walk held open by a modifier: the key coming up ends it
-        self.menu.is_some() || self.finder.is_some() || self.selector.is_some() || self.url_edit.is_some() || self.commands.is_some() || self.switcher.is_some() || self.overview.is_some() || self.session_edit.is_some() || self.session_menu || self.tag_edit.is_some() || self.picker.is_some() || self.cwd_picker.is_some() || self.quick.is_some()
+        self.menu.is_some() || self.finder.is_some() || self.selector.is_some() || self.url_edit.is_some() || self.commands.is_some() || self.switcher.is_some() || self.overview.is_some() || self.session_edit.is_some() || self.session_menu || self.app_menu.is_some() || self.tag_edit.is_some() || self.picker.is_some() || self.cwd_picker.is_some() || self.quick.is_some()
     }
 
     /// A web window's handle pressed (its header draws it, not a tag):
@@ -5057,6 +5063,11 @@ impl Acme {
             cx.notify();
             return;
         }
+        if self.app_menu.is_some() && e.keystroke.key == "escape" {
+            self.app_menu = None;
+            cx.notify();
+            return;
+        }
         if self.commands.is_some() {
             let ks = &e.keystroke;
             self.commands_key(&ks.key, ks.key_char.as_deref(), &ks.modifiers, cx);
@@ -5100,7 +5111,11 @@ impl Acme {
             Target::Term(_, t) => {
                 // the shell's prompt marks (OSC 133): ⌘↑ ⌘↓ from prompt to
                 // prompt, ⌘⇧C the last command's output
-                if m.platform && !m.shift && (ks.key == "up" || ks.key == "down") {
+                // off the Mac a Linux terminal's: control and shift with C
+                // and V copy and paste, plain control being the program's
+                if !cfg!(target_os = "macos") && m.control && m.shift && !m.alt && (ks.key == "c" || ks.key == "v") {
+                    self.menu_edit(if ks.key == "c" { "copy" } else { "paste" }, window, cx);
+                } else if m.platform && !m.shift && (ks.key == "up" || ks.key == "down") {
                     self.term_jump(t, ks.key == "up");
                 } else if m.platform && m.shift && ks.key == "c" {
                     self.term_copy_last(t, cx);
@@ -5141,6 +5156,44 @@ impl Acme {
         }
         self.completion_follow(cx);
         cx.notify();
+    }
+
+    /// Off the Mac, whether a control key is for what the keys go to
+    /// (as `key_down` finds it) rather than for the shortcut it would
+    /// be there, control standing in for ⌘ (`shell::control_keys`): a
+    /// terminal's program has every control letter (^C ^D ^Z ^W ^R ...)
+    /// and ^[ ^] ^\ ^space; acme's text the keys acme's typing gives a
+    /// meaning (^A ^E ^U ^W ^H, and ^F's completion); a field the keys it
+    /// edits by. With shift, or alt, a control key is the shortcut's
+    /// everywhere: Ctrl+Shift+N is still Win in a terminal.
+    pub fn claims_control(&self, ks: &Keystroke, window: &Window) -> bool {
+        let m = ks.modifiers;
+        if cfg!(target_os = "macos") || !m.control || m.shift || m.alt || m.platform || m.function {
+            return false;
+        }
+        let k = ks.key.as_str();
+        if self.overview.is_some() || self.switcher.is_some() {
+            return false;
+        }
+        if self.finder.is_some() || self.quick.is_some() || self.url_edit.is_some() || self.tag_edit.is_some() || self.picker.is_some() || self.cwd_picker.is_some() || self.session_edit.is_some() || self.commands.is_some() || self.selector.is_some() {
+            // `LineEdit::key`'s
+            return matches!(k, "a" | "e" | "b" | "f" | "d" | "h" | "u" | "w" | "k");
+        }
+        if crate::web::native_mouse(window).and_then(|p| self.webs.window_at(p)).is_some() {
+            return false;
+        }
+        let pos = self.pointer(window);
+        let target = match self.locate(pos) {
+            None if self.over_overlay(pos) => self.kept_target(),
+            Some((Target::Web(_), _)) => self.node.seltext.map(Target::View),
+            None => None,
+            Some((t, _)) => Some(t),
+        };
+        match target {
+            Some(Target::Term(..)) => (k.len() == 1 && k.as_bytes()[0].is_ascii_lowercase()) || matches!(k, "[" | "]" | "\\" | "space"),
+            Some(Target::View(_)) => matches!(k, "a" | "e" | "u" | "w" | "h" | "f"),
+            _ => false,
+        }
     }
 
     /// The window acme would act on: the one under the pointer, else the

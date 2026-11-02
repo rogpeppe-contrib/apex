@@ -652,8 +652,24 @@ shards
 
 ## 5. Open questions
 
-- Linux: WebKitGTK's proxy configuration and child-view placement under
-  Wayland need trying before the client claims it.
+- Linux: tried under X11 (WebKitGTK through wry), not under Wayland,
+  where wry makes no child views and a window has no pages. What it
+  took: gpui hands over an XCB window and wry wants Xlib's (the same X
+  window, re-labelled); wry places a child by a scale of its own, so a
+  page is placed in the X window's own pixels and zoomed to gpui's
+  scale; GTK's loop turned on an 8 ms timer while there are pages (a
+  page's frame takes several turns, and at 100 ms typing lagged a
+  second). WebKitGTK honours the proxy, but sends a plain http:// page
+  as an absolute-form GET where WebKit on the Mac tunnels everything;
+  the proxy takes those too, as a tunnel to the host with the request
+  in origin form down it. The custom schemes keep their names
+  (`apexfile://localhost/...` as on the Mac). Holes are the page's X
+  window's SHAPE. The keys: X sends them to the window under the
+  pointer, so a page has them while the pointer is over it, ⌃C and ⌃V
+  its own, and gpui's shortcuts never come; while an overlay has the
+  keys the pages take no pointer at all (an empty input shape), which
+  also means no wheel in a page meanwhile. Not done: the veil over a
+  page under a dialog, its rounded foot.
 - Whether a web window's page selection should feed the snarf buffer
   (⌘C in the page copies as a browser would; making it acme's snarf is
   a small bridge, probably wanted).

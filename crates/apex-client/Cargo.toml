@@ -27,6 +27,13 @@ gpui_platform = { git = "https://github.com/zed-industries/zed", branch = "main"
 # wry's pages are WebKitGTK's, which need GTK initialised and its loop
 # turned (`web::pump`)
 gtk = "0.18"
+# the view under wry's, for what wry does not say (editing commands, zoom)
+webkit2gtk = "2.0"
+# gpui's window as GDK sees it, to ask where the pointer is (`web::native_mouse`)
+gdkx11 = "0.18"
+# the pointer warped on gpui's own X connection (`warp::move_to`): the
+# x11rb gpui already builds, with its libxcb wrapper
+x11rb = { version = "0.13", features = ["allow-unsafe-code"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-text = "21"

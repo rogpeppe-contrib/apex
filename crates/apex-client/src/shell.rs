@@ -130,16 +130,21 @@ pub fn menus() -> Vec<Menu> {
         Menu {
             name: "Apex".into(),
             disabled: false,
-            items: vec![
-                MenuItem::action("About Apex", About),
-                MenuItem::separator(),
-                MenuItem::action("Install apex Command…", InstallCli),
-                MenuItem::action("Restart Server…", RestartServer),
-                MenuItem::separator(),
-                MenuItem::action("Hide Apex", HideApp),
-                MenuItem::separator(),
-                MenuItem::action("Quit Apex", Quit),
-            ],
+            items: {
+                let mut items = vec![
+                    MenuItem::action("About Apex", About),
+                    MenuItem::separator(),
+                    MenuItem::action("Install apex Command…", InstallCli),
+                    MenuItem::action("Restart Server…", RestartServer),
+                    MenuItem::separator(),
+                ];
+                // no hiding an app on Linux
+                if cfg!(target_os = "macos") {
+                    items.extend([MenuItem::action("Hide Apex", HideApp), MenuItem::separator()]);
+                }
+                items.push(MenuItem::action("Quit Apex", Quit));
+                items
+            },
         },
         Menu {
             name: "File".into(),
@@ -258,66 +263,133 @@ pub fn menus() -> Vec<Menu> {
     ]
 }
 
+/// The keys, written as the Mac's: `secondary` is gpui's ⌘ there and
+/// control elsewhere, where ⌘'s key (Super) is the desktop's. Control
+/// is then also what acme's typing and a terminal's programs read: a
+/// control key either of them claims under the pointer is theirs, not
+/// a shortcut's (`control_keys`).
 pub fn bindings() -> Vec<KeyBinding> {
-    vec![
-        KeyBinding::new("cmd-q", Quit, None),
-        KeyBinding::new("cmd-h", HideApp, None),
+    let mac = cfg!(target_os = "macos");
+    let mut keys = vec![
+        KeyBinding::new("secondary-q", Quit, None),
         // acme's commands on the text under the pointer, the Mac way
-        KeyBinding::new("cmd-n", NewFile, None),
+        KeyBinding::new("secondary-n", NewFile, None),
         // acme's win, and a terminal: in the directory of the window
         // under the pointer
-        KeyBinding::new("cmd-shift-n", NewWin, None),
-        KeyBinding::new("cmd-alt-n", NewTerm, None),
-        KeyBinding::new("cmd-o", OpenPath, None),
-        KeyBinding::new("cmd-s", Put, None),
-        KeyBinding::new("cmd-t", NewTab, None),
-        KeyBinding::new("cmd-w", Del, None),
-        KeyBinding::new("cmd-shift-w", CloseTab, None),
-        KeyBinding::new("cmd-shift-k", PreviousSession, None),
-        KeyBinding::new("cmd-j", NextNotification, None),
-        KeyBinding::new("cmd-f", Find, None),
-        KeyBinding::new("cmd-g", FindNext, None),
-        KeyBinding::new("cmd-shift-g", FindPrevious, None),
-        KeyBinding::new("cmd-1", Tab1, None),
-        KeyBinding::new("cmd-2", Tab2, None),
-        KeyBinding::new("cmd-3", Tab3, None),
-        KeyBinding::new("cmd-4", Tab4, None),
-        KeyBinding::new("cmd-5", Tab5, None),
-        KeyBinding::new("cmd-6", Tab6, None),
-        KeyBinding::new("cmd-7", Tab7, None),
-        KeyBinding::new("cmd-8", Tab8, None),
-        KeyBinding::new("cmd-9", Tab9, None),
+        KeyBinding::new("secondary-shift-n", NewWin, None),
+        KeyBinding::new("secondary-alt-n", NewTerm, None),
+        KeyBinding::new("secondary-o", OpenPath, None),
+        KeyBinding::new("secondary-s", Put, None),
+        KeyBinding::new("secondary-t", NewTab, None),
+        KeyBinding::new("secondary-w", Del, None),
+        KeyBinding::new("secondary-shift-w", CloseTab, None),
+        KeyBinding::new("secondary-shift-k", PreviousSession, None),
+        KeyBinding::new("secondary-j", NextNotification, None),
+        KeyBinding::new("secondary-f", Find, None),
+        KeyBinding::new("secondary-g", FindNext, None),
+        KeyBinding::new("secondary-shift-g", FindPrevious, None),
+        KeyBinding::new("secondary-1", Tab1, None),
+        KeyBinding::new("secondary-2", Tab2, None),
+        KeyBinding::new("secondary-3", Tab3, None),
+        KeyBinding::new("secondary-4", Tab4, None),
+        KeyBinding::new("secondary-5", Tab5, None),
+        KeyBinding::new("secondary-6", Tab6, None),
+        KeyBinding::new("secondary-7", Tab7, None),
+        KeyBinding::new("secondary-8", Tab8, None),
+        KeyBinding::new("secondary-9", Tab9, None),
         // ⌘⇧[ and ⌘⇧]: macOS hands the shifted character over, so the
         // binding is on what the key makes -- { and } -- as Zed's is
-        KeyBinding::new("cmd-{", PrevTab, None),
+        KeyBinding::new("secondary-{", PrevTab, None),
         // Manifold's, and Xcode's: the sidebar
-        KeyBinding::new("ctrl-cmd-s", ToggleSidebar, None),
+        // (control and ⌘ are one key on Linux: control and alt there)
+        KeyBinding::new(if mac { "ctrl-cmd-s" } else { "ctrl-alt-s" }, ToggleSidebar, None),
         // the Mac's Minimize: here, into the stash in the title bar
-        KeyBinding::new("cmd-m", StashWindow, None),
-        KeyBinding::new("cmd-=", FontBigger, None),
-        KeyBinding::new("cmd-+", FontBigger, None),
-        KeyBinding::new("cmd--", FontSmaller, None),
-        KeyBinding::new("cmd-0", FontActual, None),
-        KeyBinding::new("cmd-shift-\\", ShowOverview, None),
-        KeyBinding::new("cmd-|", ShowOverview, None),
-        KeyBinding::new("cmd-'", ShowOverview, None),
-        KeyBinding::new("cmd-}", NextTab, None),
-        KeyBinding::new("cmd-,", Profile, None),
-        KeyBinding::new("cmd-r", Get, None),
-        KeyBinding::new("cmd-shift-r", Reconnect, None),
-        KeyBinding::new("cmd-p", Goto, None),
-        KeyBinding::new("cmd-shift-o", GotoAll, None),
-        KeyBinding::new("cmd-shift-p", Commands, None),
-        KeyBinding::new("cmd-[", NavBack, None),
-        KeyBinding::new("cmd-]", NavFwd, None),
-        KeyBinding::new("cmd-ctrl-f", ToggleFullScreen, None),
-        KeyBinding::new("cmd-z", Undo, None),
-        KeyBinding::new("cmd-shift-z", Redo, None),
-        KeyBinding::new("cmd-x", Cut, None),
-        KeyBinding::new("cmd-c", Copy, None),
-        KeyBinding::new("cmd-v", Paste, None),
-        KeyBinding::new("cmd-a", SelectAll, None),
-    ]
+        KeyBinding::new("secondary-m", StashWindow, None),
+        KeyBinding::new("secondary-=", FontBigger, None),
+        KeyBinding::new("secondary-+", FontBigger, None),
+        KeyBinding::new("secondary--", FontSmaller, None),
+        KeyBinding::new("secondary-0", FontActual, None),
+        KeyBinding::new("secondary-shift-\\", ShowOverview, None),
+        KeyBinding::new("secondary-|", ShowOverview, None),
+        KeyBinding::new("secondary-'", ShowOverview, None),
+        KeyBinding::new("secondary-}", NextTab, None),
+        KeyBinding::new("secondary-,", Profile, None),
+        KeyBinding::new("secondary-r", Get, None),
+        KeyBinding::new("secondary-shift-r", Reconnect, None),
+        KeyBinding::new("secondary-p", Goto, None),
+        KeyBinding::new("secondary-shift-o", GotoAll, None),
+        KeyBinding::new("secondary-shift-p", Commands, None),
+        KeyBinding::new("secondary-[", NavBack, None),
+        KeyBinding::new("secondary-]", NavFwd, None),
+        // the Mac's full screen key; elsewhere F11, every Linux app's
+        KeyBinding::new(if mac { "cmd-ctrl-f" } else { "f11" }, ToggleFullScreen, None),
+        KeyBinding::new("secondary-z", Undo, None),
+        KeyBinding::new("secondary-shift-z", Redo, None),
+        KeyBinding::new("secondary-x", Cut, None),
+        KeyBinding::new("secondary-c", Copy, None),
+        KeyBinding::new("secondary-v", Paste, None),
+        KeyBinding::new("secondary-a", SelectAll, None),
+    ];
+    // Hide is the Mac's: there is no hiding an app on Linux (and ^H is
+    // acme's backspace)
+    if mac {
+        keys.push(KeyBinding::new("cmd-h", HideApp, None));
+    }
+    keys
+}
+
+/// Off the Mac, a control key the text or terminal under the pointer
+/// claims (`Acme::claims_control`) goes to it before any shortcut is
+/// looked for: gpui tries the bindings first, and ^W, ^C or ^R would be
+/// Del, Copy and Get instead of the program's, or acme's. On the Mac
+/// the shortcuts are ⌘'s and control is left alone, as here it then is.
+pub fn control_keys(cx: &mut App) {
+    if cfg!(target_os = "macos") {
+        return;
+    }
+    cx.intercept_keystrokes(|e, window, cx| {
+        let Some(Some(acme)) = window.root::<Acme>() else { return };
+        if !acme.read(cx).claims_control(&e.keystroke, window) {
+            return;
+        }
+        let down = gpui::KeyDownEvent { keystroke: e.keystroke.clone(), is_held: false, prefer_character_input: false };
+        acme.update(cx, |acme, cx| acme.key_down(&down, window, cx));
+        // no binding, and no other listener: the key was the text's
+        cx.stop_propagation();
+    })
+    .detach();
+}
+
+/// Keys as the Mac writes them in what the user reads (`⌥⌘N`, `Reconnect
+/// (⌘⇧R)`), as this platform's are said: on the Mac as they are; elsewhere
+/// each run of modifiers and the key after it as `Ctrl+Alt+N`, ⌘ being
+/// control there as it is in `bindings`, and ⌃⌘ control and alt.
+pub fn keys(text: &'static str) -> gpui::SharedString {
+    if cfg!(target_os = "macos") {
+        return text.into();
+    }
+    let mut out = String::new();
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        if !"⌃⌥⇧⌘".contains(c) {
+            out.push(c);
+            continue;
+        }
+        let mut mods = vec![c];
+        while let Some(&m) = chars.peek().filter(|m| "⌃⌥⇧⌘".contains(**m)) {
+            mods.push(m);
+            chars.next();
+        }
+        let has = |m: char| mods.contains(&m);
+        let ctrl = has('⌘') || has('⌃');
+        let alt = has('⌥') || (has('⌘') && has('⌃'));
+        for (on, word) in [(ctrl, "Ctrl+"), (alt, "Alt+"), (has('⇧'), "Shift+")] {
+            if on {
+                out.push_str(word);
+            }
+        }
+    }
+    out.into()
 }
 
 // ---- the login shell's environment ------------------------------------------------------

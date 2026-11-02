@@ -1,6 +1,7 @@
 //! Moving the mouse, as acme does after layout changes (`moveto`). macOS
 //! delivers no event for a warp, so the app remembers where it put the
-//! pointer until the next real mouse event.
+//! pointer until the next real mouse event. (X delivers one, at the same
+//! place; Wayland allows no warp at all.)
 
 use gpui::{Pixels, Point, Window};
 
@@ -99,10 +100,35 @@ fn screen_point(window: &Window, p: Point<Pixels>) -> CGPoint {
     }
 }
 
-/// Not yet: X11 can warp the pointer (`XWarpPointer`), Wayland will not,
-/// and gpui offers neither. The pointer stays where it was and the app's
-/// memory of where it put it goes unmet.
-#[cfg(not(target_os = "macos"))]
+/// Put the pointer at `p`, a point in this window's coordinates: under
+/// X11 a `WarpPointer` on gpui's own connection, in the window's device
+/// pixels. X reports a warp as a motion like any other, at the point it
+/// was put, which the app's memory of where it put it agrees with.
+/// Wayland lets no client move the pointer: there it stays where it was.
+#[cfg(target_os = "linux")]
+pub fn move_to(window: &Window, p: Point<Pixels>) {
+    use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle};
+    use x11rb::connection::Connection;
+    use x11rb::protocol::xproto::ConnectionExt;
+
+    let Ok(w) = HasWindowHandle::window_handle(window) else { return };
+    let RawWindowHandle::Xcb(w) = w.as_raw() else { return };
+    let Ok(d) = HasDisplayHandle::display_handle(window) else { return };
+    let RawDisplayHandle::Xcb(d) = d.as_raw() else { return };
+    let Some(c) = d.connection else { return };
+    // SAFETY: the connection is gpui's, alive as long as the window that
+    // handed it over, which outlives this call; the wrapper is told not
+    // to disconnect it when dropped. libxcb is safe to share.
+    let Ok(conn) = (unsafe { x11rb::xcb_ffi::XCBConnection::from_raw_xcb_connection(c.as_ptr(), false) }) else { return };
+    // gpui's pixels are the window's device pixels over its scale
+    let s = window.scale_factor();
+    let (x, y) = ((f32::from(p.x) * s).round() as i16, (f32::from(p.y) * s).round() as i16);
+    let _ = conn.warp_pointer(x11rb::NONE, w.window.get(), 0, 0, 0, 0, x, y);
+    let _ = conn.flush();
+}
+
+/// Elsewhere the pointer stays where it was.
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 pub fn move_to(_window: &Window, _p: Point<Pixels>) {}
 
 /// The pointer shown, where it is: AppKit's typing-hides-it undone.

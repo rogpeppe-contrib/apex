@@ -405,7 +405,7 @@ pub struct WebHost {
     shown: bool,
     /// The holes cut in the view (`set_holes`), in the view's own
     /// coordinates, as last applied.
-    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    #[cfg_attr(not(any(target_os = "macos", target_os = "linux")), allow(dead_code))]
     holes: Vec<(f64, f64, f64, f64)>,
     /// A page from a buffer: the buffer version shown, and the directory
     /// its relative links resolve in.
@@ -464,6 +464,8 @@ impl Drop for VeilLayer {
 
 impl Drop for WebHost {
     fn drop(&mut self) {
+        #[cfg(target_os = "linux")]
+        LIVE_PAGES.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
         // the watches end with the page
         if let Some(plane) = &self.plane {
             for (_, stream) in self.watches.lock().unwrap().drain() {
@@ -681,6 +683,9 @@ pub struct Webs {
     /// The overlays over the pages this frame (the window's coordinates):
     /// the pointer there is not on a page.
     cut: Vec<Bounds<Pixels>>,
+    /// The pages take no pointer, and so no keys (`set_deaf`).
+    #[cfg(target_os = "linux")]
+    deaf: bool,
 }
 
 /// A page that has the keyboard when its view goes hands it back first.
@@ -721,7 +726,7 @@ impl Webs {
         if std::env::var_os("APEX_WEB_DEBUG").is_some() {
             eprintln!("web: views over a plane: {}, proxy port {proxy:?}", plane.is_some());
         }
-        Webs { hosts: HashMap::new(), tx, rx, plane, proxy, wake, focused: None, cursors: HashMap::new(), cut: Vec::new() }
+        Webs { hosts: HashMap::new(), tx, rx, plane, proxy, wake, focused: None, cursors: HashMap::new(), cut: Vec::new(), #[cfg(target_os = "linux")] deaf: false }
     }
 
     /// The shown page under `pos`, if any.
@@ -764,7 +769,25 @@ impl Webs {
         true
     }
 
-    #[cfg(not(target_os = "macos"))]
+    /// WebKitGTK's editing commands, on the page's selection; what it
+    /// copies goes to GTK's clipboard, the system's.
+    #[cfg(target_os = "linux")]
+    pub fn edit(&self, w: WindowId, what: &str) -> bool {
+        use webkit2gtk::WebViewExt;
+        use wry::WebViewExtUnix;
+        let Some(h) = self.hosts.get(&w) else { return false };
+        let command = match what {
+            "copy" => "Copy",
+            "cut" => "Cut",
+            "paste" => "Paste",
+            "select-all" => "SelectAll",
+            _ => return false,
+        };
+        h.view.webview().execute_editing_command(command);
+        true
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     pub fn edit(&self, _w: WindowId, _what: &str) -> bool {
         false
     }
@@ -864,7 +887,52 @@ impl Webs {
         }
     }
 
-    #[cfg(not(target_os = "macos"))]
+    /// On X11 the holes are cut in the page's X window itself, its shape
+    /// (the SHAPE extension, by way of GDK): where it is cut gpui's window
+    /// shows, and has the clicks.
+    #[cfg(target_os = "linux")]
+    pub fn set_holes(&mut self, holes: &[(Bounds<Pixels>, Pixels)]) {
+        use gtk::prelude::WidgetExt;
+        use wry::WebViewExtUnix;
+        self.cut = holes.iter().map(|&(o, _)| o).collect();
+        for h in self.hosts.values_mut() {
+            let Some(vb) = h.bounds else { continue };
+            if !h.shown {
+                continue;
+            }
+            let local: Vec<(f64, f64, f64, f64)> = holes
+                .iter()
+                .filter_map(|&(o, margin)| {
+                    let x0 = (o.origin.x - margin).max(vb.origin.x);
+                    let y0 = (o.origin.y - margin).max(vb.origin.y);
+                    let x1 = (o.origin.x + o.size.width + margin).min(vb.origin.x + vb.size.width);
+                    let y1 = (o.origin.y + o.size.height + margin).min(vb.origin.y + vb.size.height);
+                    (x1 > x0 && y1 > y0).then(|| (f64::from(f32::from(x0 - vb.origin.x)), f64::from(f32::from(y0 - vb.origin.y)), f64::from(f32::from(x1 - x0)), f64::from(f32::from(y1 - y0))))
+                })
+                .collect();
+            if local == h.holes {
+                continue;
+            }
+            h.holes = local.clone();
+            let Some(gw) = h.view.webview().toplevel().and_then(|t| t.window()) else { continue };
+            if local.is_empty() {
+                x11_shape(&gw, SHAPE_BOUNDING, None);
+                continue;
+            }
+            // gpui's points to the X window's: its width in each
+            let (w, hh) = (gw.width().max(1), gw.height().max(1));
+            let k = f64::from(w) / f64::from(f32::from(vb.size.width)).max(1.);
+            let region = gtk::cairo::Region::create_rectangle(&gtk::cairo::RectangleInt::new(0, 0, w, hh));
+            for (x, y, cw, ch) in &local {
+                let (x0, y0) = ((x * k).floor() as i32, (y * k).floor() as i32);
+                let (x1, y1) = (((x + cw) * k).ceil() as i32, ((y + ch) * k).ceil() as i32);
+                let _ = region.subtract_rectangle(&gtk::cairo::RectangleInt::new(x0, y0, x1 - x0, y1 - y0));
+            }
+            x11_shape(&gw, SHAPE_BOUNDING, Some(&region));
+        }
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     pub fn set_holes(&mut self, holes: &[(Bounds<Pixels>, Pixels)]) {
         self.cut = holes.iter().map(|&(o, _)| o).collect();
     }
@@ -966,6 +1034,8 @@ impl Webs {
     /// anything else gpui's view does. Called on a timer while pages
     /// exist, since a native view keeps the pointer's moves to itself.
     pub fn focus_tick(&mut self, window: &Window) {
+        #[cfg(target_os = "linux")]
+        self.set_deaf(false);
         let Some(pos) = native_mouse(window) else { return };
         let over = self.window_at(pos);
         if over != self.focused {
@@ -998,17 +1068,49 @@ impl Webs {
     /// that key comes up, and a page with the keys would hear it instead).
     pub fn unfocus(&mut self, window: &Window) {
         focus_ui(window);
+        #[cfg(target_os = "linux")]
+        self.set_deaf(true);
         if let Some(h) = self.focused.and_then(|w| self.hosts.get(&w)) {
             let _ = h.view.evaluate_script("window.__apexAway&&__apexAway()");
         }
         self.focused = None;
     }
 
-    fn rect(bounds: Bounds<Pixels>) -> wry::Rect {
+    /// On X11 the keys go to the window under the pointer, a page's when
+    /// it is over one, whoever has the focus: there is no taking them
+    /// from it, as AppKit's first responder is taken. So while an overlay
+    /// has the keys the pages take no pointer at all (an empty input
+    /// shape), and the pointer over one is over gpui's window, where the
+    /// keys then go. A page does not scroll under the wheel meanwhile.
+    #[cfg(target_os = "linux")]
+    fn set_deaf(&mut self, deaf: bool) {
+        if self.deaf == deaf {
+            return;
+        }
+        self.deaf = deaf;
+        for h in self.hosts.values() {
+            h.set_deaf(deaf);
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn rect(bounds: Bounds<Pixels>, _window: &Window) -> wry::Rect {
         wry::Rect {
             position: wry::dpi::LogicalPosition::new(f32::from(bounds.origin.x), f32::from(bounds.origin.y)).into(),
             size: wry::dpi::LogicalSize::new(f32::from(bounds.size.width), f32::from(bounds.size.height)).into(),
         }
+    }
+
+    /// In the X window's own pixels: wry places a new child view by a
+    /// scale of its own (the screen's size in millimetres) and moves it by
+    /// GTK's (whole numbers), neither of them gpui's, so logical points
+    /// land wherever those disagree.
+    #[cfg(target_os = "linux")]
+    fn rect(bounds: Bounds<Pixels>, window: &Window) -> wry::Rect {
+        let s = window.scale_factor();
+        let (x, y) = ((f32::from(bounds.origin.x) * s).round(), (f32::from(bounds.origin.y) * s).round());
+        let (w, h) = ((f32::from(bounds.size.width) * s).round(), (f32::from(bounds.size.height) * s).round());
+        wry::Rect { position: wry::dpi::PhysicalPosition::new(x as i32, y as i32).into(), size: wry::dpi::PhysicalSize::new(w.max(1.) as u32, h.max(1.) as u32).into() }
     }
 
     /// Put window `w`'s view at `bounds`, building it on `url` the first
@@ -1018,7 +1120,7 @@ impl Webs {
             self.build(w, Page::Url { url, client }, bounds, window, visible);
             return;
         }
-        let rect = Self::rect(bounds);
+        let rect = Self::rect(bounds, window);
         let h = self.hosts.get_mut(&w).unwrap();
         if h.url != url {
             // the state moved the page (a Goto, another client): follow
@@ -1037,7 +1139,7 @@ impl Webs {
             self.build(w, Page::Html { html, version, dir, client }, bounds, window, visible);
             return;
         }
-        let rect = Self::rect(bounds);
+        let rect = Self::rect(bounds, window);
         let h = self.hosts.get_mut(&w).unwrap();
         if h.html.as_ref().is_some_and(|(v, _)| *v != version) {
             h.html = Some((version, dir.to_string()));
@@ -1065,7 +1167,7 @@ impl Webs {
             eprintln!("web: {w}: no page without gtk");
             return;
         }
-        let rect = Self::rect(bounds);
+        let rect = Self::rect(bounds, window);
         let watches: Arc<Mutex<HashMap<String, u32>>> = Arc::new(Mutex::new(HashMap::new()));
         let (tx1, tx2, tx3, tx4) = (self.tx.clone(), self.tx.clone(), self.tx.clone(), self.tx.clone());
         let (wake1, wake2, wake3, wake4) = (self.wake.clone(), self.wake.clone(), self.wake.clone(), self.wake.clone());
@@ -1235,12 +1337,35 @@ impl Webs {
             Page::Url { url, .. } => (url.to_string(), None),
             Page::Html { version, dir, .. } => (String::new(), Some((version, dir.to_string()))),
         };
-        match b.build_as_child(window) {
+        #[cfg(target_os = "linux")]
+        let built = b.build_as_child(&XlibParent(window));
+        #[cfg(not(target_os = "linux"))]
+        let built = b.build_as_child(window);
+        match built {
             Ok(view) => {
+                #[cfg(target_os = "linux")]
+                LIVE_PAGES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 let _ = view.set_visible(visible);
                 round_foot(&view);
+                #[cfg(target_os = "linux")]
+                {
+                    // the page as large as gpui's text: GTK scales by whole
+                    // numbers, the screen's dpi by what it is
+                    use gtk::prelude::WidgetExt;
+                    use wry::WebViewExtUnix;
+                    let gtk_scale = f64::from(view.webview().scale_factor().max(1));
+                    let zoom = f64::from(window.scale_factor()) / gtk_scale;
+                    if (zoom - 1.).abs() > 0.01 {
+                        let _ = view.zoom(zoom);
+                    }
+                }
                 let loading = if from_buffer { None } else { Some(std::time::Instant::now()) };
-                self.hosts.insert(w, WebHost { view, url, bounds: Some(bounds), shown: visible, holes: Vec::new(), html, followed: None, reloads: None, owned: None, loading, watches, plane: self.plane.clone(), scroll: None, restoring: None, toc: None, veil: None });
+                let h = WebHost { view, url, bounds: Some(bounds), shown: visible, holes: Vec::new(), html, followed: None, reloads: None, owned: None, loading, watches, plane: self.plane.clone(), scroll: None, restoring: None, toc: None, veil: None };
+                #[cfg(target_os = "linux")]
+                if self.deaf {
+                    h.set_deaf(true);
+                }
+                self.hosts.insert(w, h);
             }
             Err(e) => eprintln!("web: {w}: {e}"),
         }
@@ -1695,31 +1820,114 @@ pub fn focus_ui(window: &Window) {
     }
 }
 
+/// Nothing to take back on X11: the keys go to the window under the
+/// pointer, gpui's as soon as it leaves a page (and while an overlay is
+/// up, `Webs::set_deaf`).
 #[cfg(not(target_os = "macos"))]
 pub fn focus_ui(_window: &Window) {}
 
-/// What the pages' toolkit needs before the first page: GTK initialised
-/// on the main thread (wry panics otherwise). Whether it is; a page is
-/// not made without it.
+/// gpui's X11 window as wry takes a parent: by Xlib's handle, where gpui
+/// gives XCB's. The window is the same X window either way.
 #[cfg(target_os = "linux")]
-pub fn platform_init() -> bool {
-    match gtk::init() {
-        Ok(()) => true,
-        Err(e) => {
-            eprintln!("apex-ui: no pages: gtk: {e}");
-            false
+struct XlibParent<'a>(&'a Window);
+
+#[cfg(target_os = "linux")]
+impl raw_window_handle::HasWindowHandle for XlibParent<'_> {
+    fn window_handle(&self) -> Result<raw_window_handle::WindowHandle<'_>, raw_window_handle::HandleError> {
+        use raw_window_handle::{RawWindowHandle, WindowHandle, XlibWindowHandle};
+        let h = raw_window_handle::HasWindowHandle::window_handle(self.0)?;
+        match h.as_raw() {
+            // SAFETY: the window is gpui's, alive while `self.0` is
+            RawWindowHandle::Xcb(x) => Ok(unsafe { WindowHandle::borrow_raw(RawWindowHandle::Xlib(XlibWindowHandle::new(x.window.get().into()))) }),
+            _ => Ok(h),
         }
     }
 }
 
-#[cfg(not(target_os = "linux"))]
-pub fn platform_init() -> bool {
+/// The shape that draws and takes the pointer (`set_holes`).
+#[cfg(target_os = "linux")]
+const SHAPE_BOUNDING: i32 = 0;
+/// The shape that takes the pointer alone (`set_deaf`).
+#[cfg(target_os = "linux")]
+const SHAPE_INPUT: i32 = 2;
+
+/// A page's X window shaped to `region` (its own pixels), or whole again:
+/// Xlib's SHAPE on GDK's connection. GDK's own `shape_combine_region`
+/// leaves a foreign window, which wry's container is, as it was.
+#[cfg(target_os = "linux")]
+fn x11_shape(gw: &gtk::gdk::Window, kind: i32, region: Option<&gtk::cairo::Region>) {
+    use gtk::glib::Cast;
+    #[repr(C)]
+    struct XRectangle {
+        x: i16,
+        y: i16,
+        width: u16,
+        height: u16,
+    }
+    #[link(name = "Xext")]
+    extern "C" {
+        fn XShapeCombineRectangles(dpy: *mut std::ffi::c_void, w: std::ffi::c_ulong, kind: i32, x: i32, y: i32, rects: *const XRectangle, n: i32, op: i32, ordering: i32);
+        fn XShapeCombineMask(dpy: *mut std::ffi::c_void, w: std::ffi::c_ulong, kind: i32, x: i32, y: i32, mask: std::ffi::c_ulong, op: i32);
+    }
+    const SHAPE_SET: i32 = 0;
+    const UNSORTED: i32 = 0;
+    let Some(xid) = gw.downcast_ref::<gdkx11::X11Window>().map(|w| w.xid()) else { return };
+    // SAFETY: GDK's own Xlib display, on the main thread GDK runs on; the
+    // window is the page's, alive while its view is
+    unsafe {
+        let dpy = gdkx11::ffi::gdk_x11_get_default_xdisplay() as *mut std::ffi::c_void;
+        if dpy.is_null() {
+            return;
+        }
+        match region {
+            None => XShapeCombineMask(dpy, xid, kind, 0, 0, 0, SHAPE_SET),
+            Some(r) => {
+                let rects: Vec<XRectangle> = (0..r.num_rectangles())
+                    .map(|i| r.rectangle(i))
+                    .map(|c| XRectangle { x: c.x() as i16, y: c.y() as i16, width: c.width() as u16, height: c.height() as u16 })
+                    .collect();
+                XShapeCombineRectangles(dpy, xid, kind, 0, 0, rects.as_ptr(), rects.len() as i32, SHAPE_SET, UNSORTED);
+            }
+        }
+    }
+    gw.display().flush();
+}
+
+/// What the pages' toolkit needs before the first page: GTK initialised
+/// on the main thread (wry panics otherwise), and its loop turned often
+/// enough to draw them (`pump`). Whether it is; a page is not made
+/// without it.
+#[cfg(target_os = "linux")]
+pub fn platform_init(cx: &mut gpui::App) -> bool {
+    if let Err(e) = gtk::init() {
+        eprintln!("apex-ui: no pages: gtk: {e}");
+        return false;
+    }
+    // a page's frame comes through several turns of GTK's loop (the web
+    // process's update, the frame clock, the draw): every frame's worth
+    // while there are pages, so typing in one keeps up; seldom without
+    cx.spawn(async move |cx| loop {
+        let quick = LIVE_PAGES.load(std::sync::atomic::Ordering::Relaxed) > 0;
+        cx.background_executor().timer(Duration::from_millis(if quick { 8 } else { 250 })).await;
+        pump();
+    })
+    .detach();
     true
 }
 
-/// GTK's loop turned, as often as the tick comes round: WebKitGTK's
-/// views are drawn and hear their events from it, and gpui runs its own
-/// loop, not GTK's.
+#[cfg(not(target_os = "linux"))]
+pub fn platform_init(_cx: &mut gpui::App) -> bool {
+    true
+}
+
+/// How many pages there are, across sessions: GTK's loop is turned
+/// quickly while there are any.
+#[cfg(target_os = "linux")]
+static LIVE_PAGES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// GTK's loop turned, what it has waiting and no more: WebKitGTK's views
+/// are drawn and hear their events from it, and gpui runs its own loop,
+/// not GTK's (`platform_init` turns it on a timer, the tick too).
 #[cfg(target_os = "linux")]
 pub fn pump() {
     if !gtk::is_initialized() {
@@ -1744,7 +1952,23 @@ pub fn modifiers_down() -> (bool, bool) {
     (flags & (1 << 20) != 0, flags & (1 << 18) != 0)
 }
 
-#[cfg(not(target_os = "macos"))]
+/// On X11 the pointer's query says the modifiers too; super is ⌘'s
+/// stand-in. Not known (no GTK, Wayland): both held, so that nothing
+/// waiting for one to come up ends on a guess.
+#[cfg(target_os = "linux")]
+pub fn modifiers_down() -> (bool, bool) {
+    use gtk::gdk::prelude::SeatExt;
+    use gtk::gdk::ModifierType;
+    if !gtk::is_initialized() {
+        return (true, true);
+    }
+    let Some(display) = gtk::gdk::Display::default() else { return (true, true) };
+    let (Some(pointer), Some(root)) = (display.default_seat().and_then(|s| s.pointer()), display.default_screen().root_window()) else { return (true, true) };
+    let (_, _, _, m) = root.device_position(&pointer);
+    (m.intersects(ModifierType::SUPER_MASK | ModifierType::MOD4_MASK), m.contains(ModifierType::CONTROL_MASK))
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 pub fn modifiers_down() -> (bool, bool) {
     (true, true)
 }
@@ -1881,10 +2105,30 @@ enum Page<'a> {
 }
 
 impl WebHost {
+    #[cfg(target_os = "linux")]
+    fn set_deaf(&self, deaf: bool) {
+        use gtk::prelude::WidgetExt;
+        use wry::WebViewExtUnix;
+        if let Some(gw) = self.view.webview().toplevel().and_then(|t| t.window()) {
+            x11_shape(&gw, SHAPE_INPUT, deaf.then(gtk::cairo::Region::create).as_ref());
+        }
+    }
+
     fn settle_view(&mut self, rect: wry::Rect, bounds: Bounds<Pixels>, visible: bool) {
         if self.bounds != Some(bounds) {
             let _ = self.view.set_bounds(rect);
             self.bounds = Some(bounds);
+            // an X window's shape does not follow its size: the holes are
+            // cut again for the new one (`set_holes`)
+            #[cfg(target_os = "linux")]
+            if !self.holes.is_empty() {
+                use gtk::prelude::WidgetExt;
+                use wry::WebViewExtUnix;
+                self.holes.clear();
+                if let Some(gw) = self.view.webview().toplevel().and_then(|t| t.window()) {
+                    x11_shape(&gw, SHAPE_BOUNDING, None);
+                }
+            }
         }
         if self.shown != visible {
             let _ = self.view.set_visible(visible);
@@ -2172,9 +2416,56 @@ pub fn native_mouse(window: &Window) -> Option<Point<Pixels>> {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+/// On X11: the pointer as the X server has it, relative to gpui's window
+/// (GDK's view of that window, made once and kept). Under Wayland there
+/// are no pages and no answer.
+#[cfg(target_os = "linux")]
+pub fn native_mouse(window: &Window) -> Option<Point<Pixels>> {
+    let (x, y, _) = x11_pointer(window)?;
+    let s = window.scale_factor();
+    Some(Point { x: gpui::px(x as f32 / s), y: gpui::px(y as f32 / s) })
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 pub fn native_mouse(_window: &Window) -> Option<Point<Pixels>> {
     None
+}
+
+/// The pointer in gpui's X window, in the window's pixels, and the
+/// modifiers held: XQueryPointer by way of GDK, which answers wherever
+/// the pointer is (over a page, over another application).
+#[cfg(target_os = "linux")]
+fn x11_pointer(window: &Window) -> Option<(f64, f64, gtk::gdk::ModifierType)> {
+    use gtk::gdk::prelude::SeatExt;
+    use gtk::glib::Cast;
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    use std::cell::RefCell;
+    thread_local! {
+        static FOREIGN: RefCell<HashMap<u64, gtk::gdk::Window>> = RefCell::new(HashMap::new());
+    }
+    if !gtk::is_initialized() {
+        return None;
+    }
+    let xid: u64 = match HasWindowHandle::window_handle(window).ok()?.as_raw() {
+        RawWindowHandle::Xcb(h) => h.window.get().into(),
+        RawWindowHandle::Xlib(h) => h.window as u64,
+        _ => return None,
+    };
+    let display = gtk::gdk::Display::default()?;
+    let pointer = display.default_seat()?.pointer()?;
+    let gw = FOREIGN.with(|f| {
+        let mut f = f.borrow_mut();
+        if let Some(w) = f.get(&xid) {
+            return Some(w.clone());
+        }
+        let x11 = display.downcast_ref::<gdkx11::X11Display>()?;
+        let w: gtk::gdk::Window = gdkx11::X11Window::foreign_new_for_display(x11, xid as _).upcast();
+        f.insert(xid, w.clone());
+        Some(w)
+    })?;
+    let (_, x, y, mods) = gw.device_position_double(&pointer);
+    let scale = f64::from(gw.scale_factor().max(1));
+    Some((x * scale, y * scale, mods))
 }
 
 fn respond(responder: wry::RequestAsyncResponder, status: u16, mime: &str, body: Vec<u8>) {

@@ -227,7 +227,29 @@ fn proxy_one(plane: IoPlane, mut c: TcpStream) {
     if std::env::var_os("APEX_WEB_DEBUG").is_some() {
         eprintln!("proxy: request {line:?}");
     }
-    if method != "CONNECT" || target.is_empty() {
+    // a plain http:// request in absolute form (WebKitGTK's, where
+    // WebKit on the Mac tunnels everything): a tunnel to its host all
+    // the same, the request sent down it in origin form, one per
+    // connection
+    let mut first: Option<Vec<u8>> = None;
+    let target = match target.strip_prefix("http://") {
+        Some(rest) if method != "CONNECT" => {
+            let (authority, path) = rest.find('/').map(|i| (&rest[..i], &rest[i..])).unwrap_or((rest, "/"));
+            let mut out = format!("{method} {path} {}\r\n", parts.next().unwrap_or("HTTP/1.1"));
+            for h in text.lines().skip(1).filter(|h| !h.is_empty()) {
+                let name = h.split(':').next().unwrap_or("").trim().to_ascii_lowercase();
+                if name != "proxy-connection" && name != "connection" && name != "keep-alive" {
+                    out.push_str(h);
+                    out.push_str("\r\n");
+                }
+            }
+            out.push_str("Connection: close\r\n\r\n");
+            first = Some(out.into_bytes());
+            if authority.contains(':') { authority.to_string() } else { format!("{authority}:80") }
+        }
+        _ => target,
+    };
+    if (method != "CONNECT" && first.is_none()) || target.is_empty() {
         let _ = c.write_all(b"HTTP/1.1 405 Method Not Allowed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
         return;
     }
@@ -262,9 +284,14 @@ fn proxy_one(plane: IoPlane, mut c: TcpStream) {
             return;
         }
     }
-    if c.write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n").is_err() {
-        plane.reset(stream, "client gone");
-        return;
+    match &first {
+        Some(head) => plane.send_body(stream, head),
+        None => {
+            if c.write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n").is_err() {
+                plane.reset(stream, "client gone");
+                return;
+            }
+        }
     }
     // bytes in: the socket to the stream, until the client is done
     let Ok(mut reader) = c.try_clone() else { return };

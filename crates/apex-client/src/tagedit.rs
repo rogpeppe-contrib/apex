@@ -637,7 +637,7 @@ impl Acme {
                 Some(Ok(_)) if picks.is_empty() => list = list.child(note("Nothing matches".into())),
                 Some(Ok(_)) => {}
             }
-            let foot = if p.warned { "Unsaved: ⌥↩ again to replace it" } else { "↩ open  ⌥↩ here  → in  ← up" };
+            let foot = crate::shell::keys(if p.warned { "Unsaved: ⌥↩ again to replace it" } else { "↩ open  ⌥↩ here  → in  ← up" });
             let panel = div()
                 .id("path-picker")
                 .p(px(4.))

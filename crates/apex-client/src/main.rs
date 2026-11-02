@@ -12,6 +12,7 @@
 //! prototype's way.
 
 mod app;
+mod appmenu;
 mod attention;
 mod contrast;
 // the Mac's pointers are AppKit's; elsewhere, the system's own
@@ -723,7 +724,7 @@ fn main() {
     gpui_platform::application().run(move |cx: &mut App| {
         attention::dock_icon();
         cursor::install();
-        web::platform_init();
+        web::platform_init(cx);
         text_element::install_symbols(cx);
         fonts::load();
         fonts::install(cx);
@@ -760,6 +761,7 @@ fn main() {
         cx.on_action(|_: &shell::ToggleSmoothCaret, cx| shell::toggle_smooth_caret(cx));
         cx.on_action(|_: &shell::ToggleLayoutAnimations, cx| shell::toggle_layout_animations(cx));
         cx.bind_keys(shell::bindings());
+        shell::control_keys(cx);
         cx.on_action(|_: &shell::Quit, cx| {
             // the action arrives while the focused window is mid-update,
             // where it cannot be read: everything here waits for that
@@ -1143,12 +1145,12 @@ fn empty_column(t: &theme::Theme, bunny: bool) -> gpui::AnyElement {
     use gpui::{div, prelude::*, px};
     let ink = gpui::Hsla::from(gpui::rgb(t.text_dim)).opacity(0.75);
     let faint = gpui::Hsla::from(gpui::rgb(t.text_dim)).opacity(0.55);
-    let row = |key: &'static str, what: &'static str| {
+    let row = |key: gpui::SharedString, what: &'static str| {
         div()
             .flex()
             .flex_row()
             .gap(px(10.))
-            .child(div().w(px(84.)).flex_none().text_right().font_weight(crate::fonts::weight(gpui::FontWeight::MEDIUM)).text_color(ink).child(key))
+            .child(div().w(px(if cfg!(target_os = "macos") { 84. } else { 100. })).flex_none().text_right().font_weight(crate::fonts::weight(gpui::FontWeight::MEDIUM)).text_color(ink).child(key))
             .child(div().flex_none().text_color(faint).child(what))
     };
     div()
@@ -1166,18 +1168,19 @@ fn empty_column(t: &theme::Theme, bunny: bool) -> gpui::AnyElement {
                 .gap(px(6.))
                 .font_family(crate::fonts::ui())
                 .text_size(px(12.5))
-                .child(row("⌘P", "go to a file"))
-                .child(row("⌘N", "a new window"))
-                .child(row("⌥⌘N", "a terminal"))
-                .child(row("⇧⌘N", "win, acme's shell"))
-                .child(row("⌘⇧P", "every command")),
+                .child(row(shell::keys("⌘P"), "go to a file"))
+                .child(row(shell::keys("⌘N"), "a new window"))
+                .child(row(shell::keys("⌥⌘N"), "a terminal"))
+                .child(row(shell::keys("⇧⌘N"), "win, acme's shell"))
+                .child(row(shell::keys("⌘⇧P"), "every command")),
         )
         .into_any_element()
 }
 
 /// Where the window's buttons end across the title bar, with air before
 /// the sidebar's button after them.
-const LIGHTS_W: f32 = 86.;
+/// Off the Mac, no buttons: the menu's (`appmenu.rs`).
+const LIGHTS_W: f32 = if cfg!(target_os = "macos") { 86. } else { 40. };
 
 /// The tools menu painted as the app's other menus are: a panel, its
 /// hairline, corners and shadow; each row centred in the interface's
@@ -1296,7 +1299,7 @@ impl app::Acme {
             });
         // the window's buttons' room; in full screen AppKit takes them
         // away, and the rest moves up to the edge
-        let lights = if self.fullscreen { 8. } else { LIGHTS_W };
+        let lights = if self.fullscreen && cfg!(target_os = "macos") { 8. } else { LIGHTS_W };
         // the session: its name (a click to rename it), the chevron for
         // the others, a mark when one of them wants the user -- not while
         // the sidebar is out, which says all that; then acme's top row,
@@ -1310,7 +1313,7 @@ impl app::Acme {
             .items_center()
             .border_b(px(0.5))
             .border_color(gpui::rgb(t.body_border))
-            .when(!side, |d| d.child(bare("title-lights").w(px(lights))).child(toggle).child(bare("title-gap0").w(px(6.))))
+            .when(!side, |d| d.child(bare("title-lights").w(px(lights)).children(self.app_menu_button(window, cx))).child(toggle).child(bare("title-gap0").w(px(6.))))
             // the sidebar out, the session's name is in it: the chip
             // leads the bar
             .when(side, |d| d.child(div().relative().flex_none().ml(px(8.)).mr(px(6.)).children(self.standing_chip(cx)).children(self.standing_card_panel(cx))))
@@ -1385,7 +1388,7 @@ impl app::Acme {
                         .flex()
                         .flex_row()
                         .items_center()
-                        .child(bare("title-lights").w(px(lights - inset)))
+                        .child(bare("title-lights").w(px(lights - inset)).children(self.app_menu_button(window, cx)))
                         .child(toggle)
                         .child(bare("title-card-rest").flex_1()),
                 )

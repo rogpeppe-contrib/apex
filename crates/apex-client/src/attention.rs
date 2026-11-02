@@ -58,7 +58,7 @@ pub fn tick(cx: &mut App) {
         badge(mark);
     }
     if came && !active {
-        bounce();
+        bounce(cx);
     }
 }
 
@@ -149,7 +149,7 @@ pub fn dock_icon() {}
 
 /// `-[NSApplication requestUserAttention:]`, informational: one bounce.
 #[cfg(target_os = "macos")]
-fn bounce() {
+fn bounce(_cx: &mut App) {
     const NS_INFORMATIONAL_REQUEST: isize = 10;
     unsafe {
         let app: *mut Object = msg_send![class!(NSApplication), sharedApplication];
@@ -157,10 +157,17 @@ fn bounce() {
     }
 }
 
-/// No Dock to bounce in: nothing, until a window's urgency hint is asked
-/// of gpui.
+/// No Dock to bounce in: each of the app's windows asks for the user
+/// instead (gpui's `request_attention`: under X11 the urgency hint, which
+/// the window manager shows as it will -- a flashing taskbar entry, say --
+/// and which gpui withdraws when the window is next focused; under
+/// Wayland, as yet, nothing).
 #[cfg(not(target_os = "macos"))]
-fn bounce() {}
+fn bounce(cx: &mut App) {
+    for h in cx.windows().into_iter().filter_map(|w| w.downcast::<Acme>()) {
+        let _ = h.update(cx, |_, window, _| window.request_attention());
+    }
+}
 
 /// The SF Symbol a status's mark is drawn with on the Dock icon, on its
 /// disc: as the app's own icons say it in a tag (`status_icon`).
