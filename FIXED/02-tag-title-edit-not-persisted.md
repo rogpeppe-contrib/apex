@@ -73,3 +73,17 @@ The same edit confirmed with Return, for comparison:
     field ... puts it away". This throws the edit away instead of
     committing it. `cwdbar.rs:189` and `tagedit.rs:314` (opening a
     picker) also drop it without committing.
+
+## Fix
+
+The tag field's commit (what Return did) moved into
+`Acme::tag_edit_commit` in `crates/apex-client/src/tagedit.rs`. It is
+now called, instead of the field being dropped, on any mouse press that
+reaches `Acme::mouse_down` (before the press is handled, so the click
+still does what it would have), at the start of `Acme::menu_command`
+(so Ctrl-S/⌘S Put writes to the typed name), and when a tag or cwd
+picker opens. It only proposes `SetPath`/`SetLabel` when the text
+differs from what the window already has. Escape still cancels. The
+label field shares the code and is fixed the same way. Docs updated in
+docs/userguide.html and docs/wiki/client-overlays.md. The commit is the
+one containing this section.

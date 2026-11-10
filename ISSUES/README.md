@@ -7,7 +7,7 @@ and a pointer to the likely code.
 | # | Issue | Type |
 |---|-------|------|
 | 01 | [Terminal: B1 sweep ignored when it starts soon after a click](../FIXED/01-term-click-drag.md) | **fixed**: a drag after a double-click in a terminal sweeps from the press point, as in text windows |
-| 02 | [Renaming a window in its tag is discarded unless you press Return](02-tag-title-edit-not-persisted.md) | bug |
+| 02 | [Renaming a window in its tag is discarded unless you press Return](../FIXED/02-tag-title-edit-not-persisted.md) | **fixed**: a tag rename or label edit is committed when you click elsewhere or run a command; only Esc cancels |
 | 03 | [B1 dragged below a tag stops at the pointer's column, not the tag's end](03-tag-drag-down-selection.md) | bug |
 | 04 | [Support acme's Alt compose sequences for typing Unicode](04-unicode-compose-input.md) | feature |
 | 05 | [Edit's pipe and file commands are not implemented (`Edit ,>diff $% -`)](05-edit-pipe-diff-filename.md) | feature (missing acme behaviour) |
