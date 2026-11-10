@@ -110,3 +110,19 @@ the path again, leaving none.
 - Side effect: both daemons used the same dump directory
   (`~/.apex/sessions/<socket path>/`, from `persist::dir_for`), so two
   daemons on one path also write their session dumps into the same place.
+
+## Fix
+
+`Daemon::run_keeping` now claims the socket path before binding
+(`Claim` in `crates/apex-server/src/daemon.rs`): an exclusive `flock` on
+`PATH.lock`, held for the daemon's lifetime, then a connect to the socket.
+If the lock is held or something answers, the daemon fails with
+`a daemon is already serving PATH` (`AddrInUse`; `apex server` exits 1).
+Only a socket that refuses connections is removed as stale. On exit the
+socket path is removed only if its dev/inode is still the one the daemon
+bound, and the lock file is removed while still locked (`take` re-checks
+that the file it locked is the one the path names). A client racing to
+spawn a daemon that loses just connects to the winner (`spawn_server`
+already waits for the socket to answer). Tests in
+`crates/apex-server/tests/socket.rs`. The fix is in the commit that
+contains this section.

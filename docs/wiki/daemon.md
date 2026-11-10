@@ -22,9 +22,10 @@ There are three ways a daemon process starts. All of them end in `Daemon::run(so
 
 - `put_apex_on_path()` puts `~/.apex/bin` (where a remote install puts `apex` and `rc`) and the directory of the running binary (the app bundle's) at the front of `PATH`, so a session's commands and shells find `apex` and `rc` (`daemon.rs:84-99`).
 - It ignores `SIGHUP`, so the daemon survives the terminal or ssh session that started it.
-- It removes a stale socket file, binds a `UnixListener`, and spawns an accept thread.
+- It claims the socket path (`Claim::take`): it takes an exclusive `flock` on `PATH.lock` beside the socket, held for the daemon's life, then tries to connect to the socket. If the lock is held or something answers (a daemon from before the lock), it returns an `AddrInUse` error, "a daemon is already serving PATH", and `apex server` / `apexd` exit with status 1, leaving the running daemon alone. Only a socket file nobody answers on (`ECONNREFUSED`) is removed as stale. A racing `spawn_server` whose daemon loses simply finds the winner answering.
+- It binds a `UnixListener`, records the socket's dev and inode, and spawns an accept thread.
 
-`run` gives `~/.apex/profile` as the host profile. `run_with` takes the profile as a parameter so tests can pass `None` and keep the profile out of `$HOME`. The doc comments on `run_with` and on the `host_profile` field still say "init file" (`~/.apex/init`), but the code uses `~/.apex/profile`. The socket file is removed again when the loop ends.
+`run` gives `~/.apex/profile` as the host profile. `run_with` takes the profile as a parameter so tests can pass `None` and keep the profile out of `$HOME`. The doc comments on `run_with` and on the `host_profile` field still say "init file" (`~/.apex/init`), but the code uses `~/.apex/profile`. When the loop ends, the socket file is removed only if the path still names the socket this daemon bound (same dev and inode), and then the lock file is removed and unlocked. (`take` checks that the lock file it locked is still the one the path names, so removing it on exit cannot let two daemons in.)
 
 Sources: [crates/apex-server/src/bin/apexd.rs:1-29](crates/apex-server/src/bin/apexd.rs#L1-L29), [crates/apex-server/src/daemon.rs:25-99](crates/apex-server/src/daemon.rs#L25-L99), [crates/apex-server/src/daemon.rs:237-311](crates/apex-server/src/daemon.rs#L237-L311), [crates/apex-server/src/daemon.rs:1600-1604](crates/apex-server/src/daemon.rs#L1600-L1604), [crates/apex-cli/src/main.rs:922-928](crates/apex-cli/src/main.rs#L922-L928)
 
@@ -266,6 +267,9 @@ Sources: [crates/apex-server/src/daemon.rs:466-483](crates/apex-server/src/daemo
 | `sessions_are_listed_and_made` | The registry, and that sessions are isolated from each other. |
 | `the_watcher_reloads_clean_buffers_and_flags_dirty_ones` | File watching, stale buffers, and a `Put` that refuses once. |
 | `the_daemon_says_its_build_first_and_stops_when_told` | The first frame is `Build`, and `Stop` removes the socket. |
+| `a_second_daemon_on_a_live_socket_refuses` | A daemon started on a served path (or one where a lock-less listener answers) fails with `AddrInUse` and the first stays reachable. |
+| `a_daemon_replaces_a_stale_socket` | A socket file nobody listens on is replaced. |
+| `a_stopping_daemon_leaves_a_socket_not_its_own` | A stopping daemon does not remove a socket someone else has bound on its path. |
 
 Further tests cover B3 expansion, directory windows, links to places in other sessions, and page owners being asked about links and posting to their scripts.
 
