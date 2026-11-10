@@ -75,7 +75,8 @@ The flags are bold (1), italic (2) and underline (4), plus `FLAG_WRAP` (8) on a 
 | `apex_vt_snapshot` | `screen()` | Fill `cols*rows` cells, the cursor, the viewport's `top` line and the link table |
 | `apex_vt_link` | (inside `screen()`) | URI of a 1-based link index, valid until the next snapshot |
 | `apex_vt_size` | `size()` | `(scrollback rows, total rows, at_bottom)` |
-| `apex_vt_text` | `text(from, to)` | Plain text between two screen points, wrapped lines joined; returns `-len` if the buffer is too small |
+| `apex_vt_text` | `text(from, to)` | Plain text between two screen points, both included, wrapped lines joined and no newline after the last row; returns `-len` if the buffer is too small |
+| `apex_vt_wrapped` | `wrapped(y)` | Whether a row anywhere on the screen, history included, was soft-wrapped (`GHOSTTY_ROW_DATA_WRAP` via `ghostty_grid_ref_row`). `TermHost::text` takes a client's exclusive end at column 0 of a line as running through the line end before it, and adds the `'\n'` the formatter leaves off when that row ended hard, so a line selection copies with its newline as in a body (`grid_text` in `term.rs`) |
 | `apex_vt_mode` | `mode(Mode)` | DECCKM, bracketed paste, focus events, alternate screen, any mouse mode, SGR mouse, alternate scroll |
 | `apex_vt_set_colors` | `set_colors` | Default fg/bg and a 256-entry palette (the 16 given, plus the xterm cube and grey ramp) |
 | `apex_vt_next_event` | `events()` | Pop queued events |

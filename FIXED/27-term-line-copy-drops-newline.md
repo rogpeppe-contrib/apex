@@ -138,3 +138,17 @@ the copy is `gamma delta` with no newline.
   value on the clipboard: the second copy of `last` left `none` there.
   This is worth its own issue. It doesn't affect the newline results
   above, because each of those copies changed the snarf buffer.
+
+## Fix
+
+`TermHost::text` (now `grid_text` in `crates/apex-server/src/term.rs`)
+appends the `'\n'` that ghostty's formatter leaves off when the exclusive
+end is at column 0 of a later row and the row before it ended hard. The
+wrap flag comes from a new shim call, `apex_vt_wrapped`
+(`Terminal::wrapped` in `ghostty-vt-sys`), which reads
+`GHOSTTY_ROW_DATA_WRAP` for any screen row, scrollback included, via
+`ghostty_grid_ref_row`. An end past the last row gets no newline. This
+covers every copy path (B1-B2, Ctrl+Shift+C, `Snarf`, the menu, and
+`term_copy_last`, whose output now ends in its newline). The
+`settle_snarf` side note above is a separate bug and is not fixed here.
+The fix is in the commit that moved this file to FIXED/.

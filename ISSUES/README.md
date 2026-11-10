@@ -32,7 +32,7 @@ and a pointer to the likely code.
 | 24 | [A B1 sweep dragged out of the app window stops following the pointer](24-sweep-outside-app-window.md) | bug: motion outside the OS window is dropped, so there is no autoscroll below it and a running autoscroll freezes at its last speed |
 | 25 | [Closing the tag's path picker leaves the tag several lines tall](../FIXED/25-tag-tall-after-picker-escape.md) | **fixed**: a tag whose wrapped row count changes asks for another frame, so its slot is resized at once |
 | 26 | [Typing over a selection does not put the replaced text in the snarf buffer](../FIXED/26-typing-over-selection-no-snarf.md) | **fixed**: any key that edits over a selection (typing, Return, Tab, Delete, Backspace, ^H ^U ^W) snarfs it to the session and clipboard first, in one undo step |
-| 27 | [Copying a whole-line selection in a terminal leaves off the final newline](27-term-line-copy-drops-newline.md) | bug: terminal line selections (triple-click, line drag) copy without their last newline |
+| 27 | [Copying a whole-line selection in a terminal leaves off the final newline](../FIXED/27-term-line-copy-drops-newline.md) | **fixed**: a terminal copy through a line end takes its newline, unless the row soft-wrapped |
 
 Related groups: 02, 06, 07, 13, 20 (the tag's name area); 01, 10, 12, 21 (terminal
 mouse handling); 03, 16 (B1 sweeps past the edge of the text); 12, 17, 18, 19 (double-click expansion).
