@@ -33,6 +33,8 @@ and a pointer to the likely code.
 | 25 | [Closing the tag's path picker leaves the tag several lines tall](../FIXED/25-tag-tall-after-picker-escape.md) | **fixed**: a tag whose wrapped row count changes asks for another frame, so its slot is resized at once |
 | 26 | [Typing over a selection does not put the replaced text in the snarf buffer](../FIXED/26-typing-over-selection-no-snarf.md) | **fixed**: any key that edits over a selection (typing, Return, Tab, Delete, Backspace, ^H ^U ^W) snarfs it to the session and clipboard first, in one undo step |
 | 27 | [Copying a whole-line selection in a terminal leaves off the final newline](../FIXED/27-term-line-copy-drops-newline.md) | **fixed**: a terminal copy through a line end takes its newline, unless the row soft-wrapped |
+| 28 | [Copying the same terminal text again doesn't put it back on the clipboard](28-term-copy-same-text-skips-clipboard.md) | bug: a terminal copy of the text already in the snarf buffer leaves another program's text on the clipboard |
+| 29 | [The offline / "Apex quit while reopening…" screen redraws the whole window ten times a second](29-offline-screen-redraws-constantly.md) | bug: while a waiting page is up the 100 ms tick redraws the window every time, ~60% CPU instead of ~3% |
 
 Related groups: 02, 06, 07, 13, 20 (the tag's name area); 01, 10, 12, 21 (terminal
 mouse handling); 03, 16 (B1 sweeps past the edge of the text); 12, 17, 18, 19 (double-click expansion).
