@@ -157,6 +157,24 @@ and terminals; in a terminal, a word that wraps onto the next row counts
 as one word. A drag after a single click still sweeps character by
 character.</p>
 
+<p>In the body of a Go file (one whose name ends in <code>.go</code>),
+a double-click also knows where string literals and comments are.
+Just inside either quote of a string such as
+<code>"say \"hi\" now"</code>, a raw string such as
+<code>`he said "yes"`</code> (even one running over several lines) or a
+rune such as <code>'\''</code>, or just after its closing quote, it
+selects the whole of what is between the quotes. A quote pairs only with
+its own literal's, so after <code>"one"</code> in
+<code>"one", "two"</code> it selects <code>one</code>, not the gap
+between them. Just after <code>//</code>, or just inside <code>/*</code>
+or <code>*/</code>, it selects the comment's text. Further inside a
+literal or comment the usual rules apply to its text alone (so a
+double-click inside <code>`json:"name"`</code> just after the inner
+quote selects <code>name</code>). Brackets inside literals and comments
+are ignored when matching brackets in code: a double-click just inside
+<code>f(</code> in <code>f(")")</code> selects <code>")"</code>.
+Tags, terminals and other files keep acme's rules.</p>
+
 <p>A B1 triple-click (which acme doesn't have) selects the whole line
 under the pointer, newline included. A line is the text up to a newline,
 not a row on the screen, so a long line that wraps is selected whole.

@@ -518,6 +518,15 @@ windows put away out of the tiling, which is the core's
   where each window meets the one above, as acme's column is white with
   black between.
 - **Waiting.** A tab coming up shows the system's spinner over its words.
+- **A double-click knows Go's literals** (`lang.rs`,
+  `node::double_click_lang`). In the body of a `.go` file, a click
+  just inside either quote of a string, raw string or rune, or just
+  outside its closing quote, selects the literal's contents, escaped
+  quotes and newlines and all; just inside `/*`, `*/` or after `//`, the
+  comment's. Brackets in literals and comments don't count in matching
+  those outside. acme pairs the nearest quote characters, so it takes
+  `say \` of `"say \"hi\" now"`, and the gap between `"one", "two"`.
+  Elsewhere, and in tags, terminals and other files, it is acme's rule.
 
 ## Not done
 

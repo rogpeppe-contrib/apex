@@ -83,6 +83,11 @@ impl Text {
         self.0.char_to_line(q.min(self.len()))
     }
 
+    /// The runes from `i` on.
+    pub fn chars_from(&self, i: usize) -> impl Iterator<Item = char> + '_ {
+        self.0.chars_at(i.min(self.len()))
+    }
+
     /// Feed the text to a hasher, chunk by chunk.
     pub fn hash_into(&self, h: &mut blake3::Hasher) {
         for chunk in self.0.chunks() {

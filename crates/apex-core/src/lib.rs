@@ -13,6 +13,7 @@ pub mod entry;
 pub mod expand;
 pub mod fuzzy;
 pub mod ids;
+pub mod lang;
 pub mod log;
 pub mod node;
 pub mod plumb;

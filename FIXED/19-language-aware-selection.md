@@ -115,3 +115,25 @@ Case 3, a click after the closing quote of `"one"` selects the gap between the l
   table in `crates/apex-tool-lsp/src/lib.rs:53-74` is the one piece worth sharing.
 - Possible doc conflict: DESIGN.md (around line 1998) describes double-click as acme's
   `textdoubleclick`. Language-aware matching would be a documented divergence, a MODERN.md item.
+
+## Fix
+
+Implemented for Go in the commit containing this file. A new module,
+`crates/apex-core/src/lang.rs`, holds a lexer that finds only string literals
+(interpreted, raw and rune), comments and escapes. It also chooses the language
+by file extension (`Lang::of_path`, which mirrors the `go` entry of
+apex-tool-lsp's table). The new `node::double_click_lang` lexes lazily from the
+start of the text. For a click more than 2^20 runes in, it starts instead at the
+nearest top-level declaration within that distance. It applies the rules in the
+proposal:
+- At a literal's inner edge, or just outside its closing (or opening) quote, it
+  selects the contents.
+- Just after `//`, or just inside `/*` or `*/`, it selects the comment's text.
+- Further inside a literal or comment, it applies acme's rule to the body only.
+- In code, it applies acme's rule, but bracket matching skips literals and
+  comments.
+
+The client uses `double_click_lang` for file windows' bodies. Tags, terminals
+and other files keep `double_click` (acme's rule). acme's order of tests still
+holds, so a click at the end of a line, even just after a closing quote, selects
+the line.

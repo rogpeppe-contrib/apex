@@ -46,7 +46,7 @@ There are two more ways in:
 
 | Press | Region | Effect |
 |---|---|---|
-| B1 | text | Select a caret, a `double_click` expansion on a double click, or the text line (`node::triple_click`: through its newline, whatever the wrapping) on a triple click or more (`click_count >= 3`; a fourth click stays at the line). Record `mouse.b1 = Drag{view, anchor, base, unit}` and make this the active column: `base` is what the press selected (the caret, the expansion, or the line) and `unit` is what the sweep grows by (`node::Unit::Char`, `Word` after a double click, `Line` after a triple click). |
+| B1 | text | Select a caret, a `double_click` expansion on a double click (`double_click_lang` with the body's language, `lang_of`, for a file window's body), or the text line (`node::triple_click`: through its newline, whatever the wrapping) on a triple click or more (`click_count >= 3`; a fourth click stays at the line). Record `mouse.b1 = Drag{view, anchor, base, unit}` and make this the active column: `base` is what the press selected (the caret, the expansion, or the line) and `unit` is what the sweep grows by (`node::Unit::Char`, `Word` after a double click, `Line` after a triple click). |
 | B1 while B2 held | text | Set `chord_arg`, so the B2 command takes the last selection as its argument (acme's `textselect2`). |
 | B2 / B3 | text | Record `mouse.b2` / `mouse.b3`. B3 also records `b3_reverse` (shift) and `b3_cmd`. |
 | any | layout box | Record `box_drag`. The tiling op runs on release (acme's `coldragwin` / `rowdragcol`). |

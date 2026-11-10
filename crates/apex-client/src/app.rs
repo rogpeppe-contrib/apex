@@ -3303,6 +3303,15 @@ impl Acme {
         Some(self.node.state.buffer(b).ok()?.text.clone())
     }
 
+    /// The language of a file window's body, by its name, for a
+    /// double-click there (`node::double_click_lang`); none for a tag
+    /// or any other text.
+    fn lang_of(&self, view: ViewId) -> Option<apex_core::lang::Lang> {
+        let ViewId::Body(_) = view else { return None };
+        let b = self.node.state.buffer(self.node.view_buffer(view).ok()?).ok()?;
+        (b.kind == WinKind::File).then(|| apex_core::lang::Lang::of_path(&b.name)).flatten()
+    }
+
     /// A body scrolled `dy` pixels down (up when negative) under the
     /// trackpad, as a native view scrolls: by the pixel, whole lines crossed
     /// becoming the session's first line; carried on by the system's
@@ -3612,7 +3621,7 @@ impl Acme {
                     if e.click_count >= 2 {
                         if let Some(t) = self.text_of(v) {
                             (d.base, d.unit) = match e.click_count {
-                                2 => (apex_core::node::double_click(&t, off), Unit::Word),
+                                2 => (apex_core::node::double_click_lang(&t, off, self.lang_of(v)), Unit::Word),
                                 _ => (apex_core::node::triple_click(&t, off), Unit::Line),
                             };
                         }

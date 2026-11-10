@@ -9,6 +9,7 @@ use apex_edit::{Edit as EditLang, Intent};
 
 use crate::entry::*;
 use crate::ids::*;
+use crate::lang::{self, Lang, Spans};
 use crate::log::{Log, LogError};
 use crate::state::{Applied, ApplyError, Layout, State};
 use crate::text::Text;
@@ -103,36 +104,85 @@ pub type Result<T> = std::result::Result<T, CoreError>;
 /// acme's `textdoubleclick`: a click next to a bracket or quote selects
 /// what it encloses; on a line end, the line; else the alphanumeric word.
 pub fn double_click(t: &Text, q: usize) -> (usize, usize) {
+    acme_click(t, q, (0, t.len()), None)
+}
+
+/// A double-click in a text of a known language (`Lang::of_path`; acme's
+/// `double_click` for none), as acme's, but knowing the language's string
+/// literals and comments (`lang::Spans`). A click just inside either
+/// delimiter of a literal or a comment (just after `//`), or just outside
+/// a literal's quotes, selects its contents: a quote pairs only with its
+/// own literal's, escapes, newlines in a raw string and all. Further in, it
+/// is acme's rule within the contents alone, so quotes and brackets inside
+/// match each other. Elsewhere it is acme's rule, except that a bracket
+/// inside a literal or a comment does not count in matching those outside.
+pub fn double_click_lang(t: &Text, q: usize, lang: Option<Lang>) -> (usize, usize) {
+    let Some(lang) = lang else { return double_click(t, q) };
+    let q = q.min(t.len());
+    let mut spans = Spans::new(t, lang, lang::restart(t, lang, q));
+    if let Some(s) = spans.at(q) {
+        let (b0, b1) = s.body;
+        if q == b0 || q == b1 && s.closed {
+            return s.body;
+        }
+        if b0 < q && q < b1 {
+            return acme_click(t, q, s.body, None);
+        }
+    }
+    acme_click(t, q, (0, t.len()), Some(&mut spans))
+}
+
+/// acme's `textdoubleclick` over the text in `bounds`, the text's ends
+/// for its own. With `spans`, the click is in code: a quote next to it is
+/// a literal's, and brackets in literals and comments are passed over.
+fn acme_click(t: &Text, q: usize, bounds: (usize, usize), mut spans: Option<&mut Spans>) -> (usize, usize) {
     const LEFT: [&[char]; 3] = [&['{', '[', '(', '<', '«'], &['\n'], &['\'', '"', '`']];
     const RIGHT: [&[char]; 3] = [&['}', ']', ')', '>', '»'], &['\n'], &['\'', '"', '`']];
-    let n = t.len();
-    let (mut q0, mut q1) = (q.min(n), q.min(n));
+    let (lo, hi) = bounds;
+    let (mut q0, mut q1) = (q.clamp(lo, hi), q.clamp(lo, hi));
     for i in 0..3 {
         let (l, r) = (LEFT[i], RIGHT[i]);
+        if i == 2 {
+            if let Some(sp) = spans.as_deref_mut() {
+                let lit = sp.ending_at(q0).filter(|s| s.kind.quoted()).or_else(|| sp.at(q0).filter(|s| s.open == q0 && s.kind.quoted()));
+                return match lit {
+                    Some(s) => s.body,
+                    None => word(t, q0),
+                };
+            }
+        }
+        // a bracket in a literal or a comment is no bracket
+        let lit = |sp: &mut Option<&mut Spans>, p: usize| i == 0 && sp.as_deref_mut().is_some_and(|sp| sp.at(p).is_some());
         // try matching character to left, looking right
-        let c = if q0 == 0 { '\n' } else { t.char_at(q0 - 1) };
-        if let Some(p) = l.iter().position(|&x| x == c) {
+        let c = if q0 == lo { '\n' } else { t.char_at(q0 - 1) };
+        if let Some(p) = l.iter().position(|&x| x == c).filter(|_| q0 == lo || !lit(&mut spans, q0 - 1)) {
             let mut qq = q0;
-            if click_match(t, c, r[p], 1, &mut qq) {
+            if click_match(t, c, r[p], 1, &mut qq, bounds, spans.as_deref_mut().filter(|_| i == 0)) {
                 q1 = qq - (c != '\n') as usize;
             }
             return (q0, q1);
         }
         // try matching character to right, looking left
-        let c = if q0 == n { '\n' } else { t.char_at(q0) };
-        if let Some(p) = r.iter().position(|&x| x == c) {
+        let c = if q0 == hi { '\n' } else { t.char_at(q0) };
+        if let Some(p) = r.iter().position(|&x| x == c).filter(|_| q0 == hi || !lit(&mut spans, q0)) {
             let mut qq = q0;
-            if click_match(t, c, l[p], -1, &mut qq) {
-                q1 = q0 + (q0 < n && c == '\n') as usize;
+            if click_match(t, c, l[p], -1, &mut qq, bounds, spans.as_deref_mut().filter(|_| i == 0)) {
+                q1 = q0 + (q0 < hi && c == '\n') as usize;
                 q0 = qq;
-                if c != '\n' || qq != 0 || t.char_at(0) == '\n' {
+                if c != '\n' || qq != lo || t.char_at(lo) == '\n' {
                     q0 += 1;
                 }
             }
             return (q0, q1);
         }
     }
-    // try filling out word to right, then to left
+    word(t, q0)
+}
+
+/// acme's fill out of a word: to the right, then to the left.
+fn word(t: &Text, q: usize) -> (usize, usize) {
+    let n = t.len();
+    let (mut q0, mut q1) = (q, q);
     while q1 < n && acme_isalnum(t.char_at(q1)) {
         q1 += 1;
     }
@@ -231,23 +281,32 @@ pub fn acme_isalnum(c: char) -> bool {
     !"!\"#$%&'()*+,-./:;<=>?@[\\]^`{|}~".contains(c)
 }
 
-/// acme's `textclickmatch`.
-fn click_match(t: &Text, cl: char, cr: char, dir: i32, q: &mut usize) -> bool {
-    let n = t.len();
+/// acme's `textclickmatch`, within `bounds`, passing over `spans`
+/// (literals and comments) when there are any.
+fn click_match(t: &Text, cl: char, cr: char, dir: i32, q: &mut usize, bounds: (usize, usize), mut spans: Option<&mut Spans>) -> bool {
+    let (lo, hi) = bounds;
     let mut nest = 1;
     loop {
         let c;
         if dir > 0 {
-            if *q == n {
+            if *q == hi {
                 break;
+            }
+            if let Some(s) = spans.as_deref_mut().and_then(|sp| sp.at(*q)) {
+                *q = s.end;
+                continue;
             }
             c = t.char_at(*q);
             *q += 1;
         } else {
-            if *q == 0 {
+            if *q == lo {
                 break;
             }
             *q -= 1;
+            if let Some(s) = spans.as_deref_mut().and_then(|sp| sp.at(*q)) {
+                *q = s.open;
+                continue;
+            }
             c = t.char_at(*q);
         }
         if c == cr {
@@ -2592,6 +2651,99 @@ mod click_tests {
         // the text's ends
         assert_eq!((word_end(&t, 1000), word_start(&t, 1000)), (t.len(), t.len()));
         assert_eq!(word_start(&t, 0), 0);
+    }
+
+    /// What a double-click in Go at the `‸` in `src` selects.
+    fn go_click(src: &str) -> String {
+        let q = src.chars().position(|c| c == '‸').expect("a click");
+        let t = Text::new(&src.replacen('‸', "", 1));
+        let (q0, q1) = double_click_lang(&t, q, Some(Lang::Go));
+        t.slice(q0, q1)
+    }
+
+    #[test]
+    fn a_double_click_at_a_go_literals_quote_selects_the_literal() {
+        // the issue's cases: an escaped quote, a raw string with quotes in
+        // it, the gap between two literals, a rune of a quote
+        assert_eq!(go_click(r#"var msg = "‸say \"hi\" now""#), r#"say \"hi\" now"#);
+        assert_eq!(go_click(r#"var msg = "say \"hi\" now‸""#), r#"say \"hi\" now"#);
+        assert_eq!(go_click("var raw = `he said \"yes\"‸`\n\nvar a, b = \"one\", \"two\""), r#"he said "yes""#);
+        assert_eq!(go_click(r#"var a, b = "one"‸, "two""#), "one");
+        assert_eq!(go_click(r#"var a, b = "one",‸ "two""#), "", "next to neither quote: the word rule");
+        assert_eq!(go_click(r#"var a, b = "one", ‸"two""#), "two");
+        assert_eq!(go_click(r"var r = '‸\''"), r"\'");
+        assert_eq!(go_click(r"var r = '\'‸'"), r"\'");
+        assert_eq!(go_click(r"var r = '\''‸ + x"), r"\'");
+        // at the end of a line, acme's line comes first, as at a bracket
+        assert_eq!(go_click("var r = '\\''‸\n"), "var r = '\\''\n");
+        assert_eq!(go_click(r#"r := '‸"'"#), "\"");
+        assert_eq!(go_click(r#"r := '"'‸ + "x""#), "\"");
+        // a raw string over lines, from either end
+        let raw = "s := `‸line one\n\"two\"\nthree`\n";
+        assert_eq!(go_click(raw), "line one\n\"two\"\nthree");
+        assert_eq!(go_click(&raw.replace('‸', "").replace("three`", "three‸`")), "line one\n\"two\"\nthree");
+        // a string ending in an escaped backslash
+        assert_eq!(go_click(r#"p := "‸C:\\" + "x""#), r"C:\\");
+        assert_eq!(go_click(r#"p := "C:\\‸" + "x""#), r"C:\\");
+        // empty literals
+        assert_eq!(go_click(r#"f("‸", "")"#), "");
+        // acme's own rule pairs the wrong quotes in all of these
+        let t = Text::new(r#"var a, b = "one", "two""#);
+        assert_eq!(double_click(&t, 16), (16, 18), "acme takes the gap");
+    }
+
+    #[test]
+    fn inside_a_go_literal_a_double_click_keeps_to_it() {
+        // quotes inside a raw string pair as acme's do, within it
+        assert_eq!(go_click(r#"tag := `json:"‸name"`"#), "name");
+        // a word inside a string
+        assert_eq!(go_click(r#"s := "hello wo‸rld""#), "world");
+        // brackets inside a string match within that string
+        assert_eq!(go_click(r#"s := "f(‸a, (b)) )""#), "a, (b)");
+        assert_eq!(go_click(r#"s := "x[‸y" + "]""#), "", "not with a bracket in another string");
+        // a line inside a raw string ends with it
+        assert_eq!(go_click("s := `one\n‸two`\n"), "two");
+    }
+
+    #[test]
+    fn go_comments_are_selected_and_their_brackets_and_quotes_ignored() {
+        assert_eq!(go_click("x := 1 //‸ it's \"so\"\ny := 2"), " it's \"so\"");
+        assert_eq!(go_click("x /*‸ a (b \"c */ y"), " a (b \"c ");
+        assert_eq!(go_click("x /* a (b \"c ‸*/ y"), " a (b \"c ");
+        assert_eq!(go_click("/* a\n‸b */"), "b ", "a line within the comment");
+        // at the end of a line with a comment, still the line
+        assert_eq!(go_click("x := 1 // f(\n‸y"), "y");
+        assert_eq!(go_click("x := 1 // f(‸\ny)"), "x := 1 // f(\n");
+        // a quote in a comment pairs with nothing outside it
+        assert_eq!(go_click("// don't‸\nx := 'a'"), "// don't\n");
+    }
+
+    #[test]
+    fn go_brackets_match_past_literals_and_comments() {
+        assert_eq!(go_click(r#"f(‸")")"#), r#"")""#);
+        assert_eq!(go_click(r#"f(")"‸)"#), r#"")""#);
+        assert_eq!(go_click("f(‸a, `)\n)`, ')' /* ) */, b) // )\n)"), "a, `)\n)`, ')' /* ) */, b");
+        assert_eq!(go_click("func f() {‸\n\ts := \"}\"\n\tif x { g('{') }\n}\n"), "\n\ts := \"}\"\n\tif x { g('{') }\n");
+        assert_eq!(go_click("func f() {\n\ts := \"{\"\n\tif x { g('}') }\n‸}\n"), "\n\ts := \"{\"\n\tif x { g('}') }\n");
+        // nested, with strings inside
+        assert_eq!(go_click(r#"m[k[‸"]"]] = v"#), r#""]""#);
+        assert_eq!(go_click(r#"m[‸k["]"]] = v"#), r#"k["]"]"#);
+        // the rest is acme's
+        assert_eq!(go_click("x := foo‸bar(1)"), "foobar");
+        assert_eq!(go_click("x := 1\n‸y := 2\n"), "y := 2\n");
+    }
+
+    #[test]
+    fn without_a_language_a_double_click_is_acmes() {
+        for (src, q) in [(r#"var a, b = "one", "two""#, 16), (r#"s := "say \"hi\" now""#, 6), ("f(\")\")", 2)] {
+            let t = Text::new(src);
+            assert_eq!(double_click_lang(&t, q, None), double_click(&t, q), "{src}");
+        }
+        // the sweep from a literal grows from it by words
+        let t = Text::new(r#"x := "one two" + three"#);
+        let base = double_click_lang(&t, 6, Some(Lang::Go));
+        assert_eq!(base, (6, 13));
+        assert_eq!(sweep(&t, Unit::Word, base, 20), (6, 22));
     }
 
     #[test]
