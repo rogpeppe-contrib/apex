@@ -57,6 +57,11 @@ pub struct Buffer {
     pub disk_hash: Option<String>,
     /// The file on disk changed underneath while the buffer was dirty.
     pub stale: bool,
+    /// Changed, as far as Put cares, though the text may not have:
+    /// acme's 1-2 chord with nothing selected. The next load or Put
+    /// clears it.
+    #[serde(default)]
+    pub marked: bool,
     pub views: BTreeMap<ViewId, View>,
     pub undo: Vec<Group>,
     pub redo: Vec<Group>,
@@ -105,6 +110,7 @@ impl Buffer {
             clean_version: 0,
             disk_hash,
             stale: false,
+            marked: false,
             views: BTreeMap::new(),
             undo: Vec::new(),
             redo: Vec::new(),
@@ -116,8 +122,11 @@ impl Buffer {
     /// disk: typing and undoing it all is clean again, as in acme (whose
     /// undo takes the file's sequence back to where Put left it; here the
     /// version only goes forward, and the text is held to the disk's
-    /// hash instead).
+    /// hash instead). Marked (`marked`) is dirty whatever the text.
     pub fn dirty(&self) -> bool {
+        if self.marked {
+            return true;
+        }
         if self.version == self.clean_version {
             return false;
         }
@@ -238,7 +247,7 @@ impl Buffer {
         self.text.hash_into(h);
         h.update(&self.version.to_le_bytes());
         h.update(&self.clean_version.to_le_bytes());
-        h.update(&[self.stale as u8]);
+        h.update(&[self.stale as u8, self.marked as u8]);
         if let Some(d) = &self.disk_hash {
             h.update(d.as_bytes());
         }

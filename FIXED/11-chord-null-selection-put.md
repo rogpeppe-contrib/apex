@@ -99,3 +99,16 @@ The same window after typing (dirty: filled dot, Undo and Put icons):
   - The chord is handled in `crates/apex-client/src/app.rs:3604` (`chord`)
     and `app.rs:5542` (`cut`). The option-key form of the chord
     (`modifiers_changed`, about `app.rs:3995`) goes through the same `cut`.
+
+## Fix
+
+The buffer has a new replicated flag, `marked`, set by a new
+`BufferOp::Mark` and cleared by `BufferOp::Clean` (load, Put, Get, a
+tool's `set_clean`). `Buffer::dirty` is true while it is set, so Put shows
+in the tag, the dot fills, and Putall writes the window. `Node::mark`
+appends it for a clean, non-scratch file's body; the client calls it
+before the B1-B2 and B1-B3 chords (and their ⌥/⌘ forms), and the `Cut` and
+`Paste` built-ins call it too, as acme's exec does (`e->mark`). Tags,
+directories, scratch windows and the keyboard's cut/paste are unaffected.
+A session dump keeps the flag. The fix is in the commit that contains
+this section.

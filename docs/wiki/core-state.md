@@ -77,6 +77,7 @@ pub enum Op { Buffer(BufferOp), Window(WindowOp), Layout(LayoutOp), Term(TermOp)
 | `Undo { version }` / `Redo { version }` | Undo or redo the latest group. The inverse is derived from history in the state |
 | `Clean { version, disk_hash }` | The file on disk equals the text at `version` |
 | `Stale { disk_hash }` | The file changed underneath a dirty buffer |
+| `Mark` | Dirty until the next `Clean`, whatever the text (acme's `filemark`: a chord, `Cut` or `Paste` in a body) |
 | `Rename { name }` | New name |
 | `ViewAdd`, `ViewDel` | A window started or stopped viewing this buffer |
 | `Select { view, q0, q1 }`, `Origin { view, origin }` | A view's selection and scroll origin |
@@ -249,7 +250,7 @@ flowchart TD
 
 ### Per-shard rules
 
-**Buffers.** `Create` fails with `Exists` if the id is taken. `Edit`, `Undo` and `Redo` must name the buffer's current version or fail with `Version`; this optimistic check is what catches an edit composed against stale text. `Clean` sets the clean version and disk hash and clears `stale`. `Stale` sets the flag and the new hash. View ops call `Buffer::set_select` and `set_origin` ([state.rs:598-658](crates/apex-core/src/state.rs#L598-L658)).
+**Buffers.** `Create` fails with `Exists` if the id is taken. `Edit`, `Undo` and `Redo` must name the buffer's current version or fail with `Version`; this optimistic check is what catches an edit composed against stale text. `Clean` sets the clean version and disk hash and clears `stale` and `marked`. `Mark` sets `marked`. `Stale` sets the flag and the new hash. View ops call `Buffer::set_select` and `set_origin` ([state.rs:598-658](crates/apex-core/src/state.rs#L598-L658)).
 
 **Windows.** `Tab` clamps the tab stop to at least 1. `ProgramStatus` stores the status as given, or clears it. `Exec` inserts a record under the entry's own sequence. `Status` fails with `Missing` if that exec does not exist. `Delete` removes the window and also calls `Layout::unplace`, so a layout never refers to a deleted window ([state.rs:660-697](crates/apex-core/src/state.rs#L660-L697)). `unplace` removes the window from every column, the stash and the cover stacks. If the window was in the middle of a stack, the window above it is joined to the one below, keeping the stack whole ([state.rs:352-365](crates/apex-core/src/state.rs#L352-L365)).
 

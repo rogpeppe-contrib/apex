@@ -88,6 +88,7 @@ The fields of `Buffer` ([crates/apex-core/src/buffer.rs:43-67](crates/apex-core/
 | `clean_version` | The version at the last load or `Put`. |
 | `disk_hash` | The content hash of what is on disk, when known. |
 | `stale` | The file changed on disk while the buffer was dirty. |
+| `marked` | Changed as far as Put cares, though the text may not be (see below). |
 | `views` | One `View` per text showing the buffer, keyed by `ViewId`. |
 | `undo`, `redo` | Stacks of `Group`s. |
 
@@ -97,11 +98,14 @@ The fields of `Buffer` ([crates/apex-core/src/buffer.rs:43-67](crates/apex-core/
 
 `dirty()` is computed, not stored ([crates/apex-core/src/buffer.rs:115-130](crates/apex-core/src/buffer.rs#L115-L130)). A buffer is clean when `version == clean_version`. Otherwise, with no `disk_hash`, it is dirty. With a `disk_hash`, it is dirty only if the text's hash differs from the disk's. As a result, typing something and undoing it all leaves the buffer clean again, as in acme. Acme gets this by rewinding the file's sequence number on undo. Apex's version only goes forward, so it compares the text against the disk's hash instead. Retyping the original text by hand also makes the buffer clean. Without a disk hash, any change makes it dirty, even one that is undone (see the test `typing_and_undoing_it_all_is_clean_again`, [crates/apex-core/src/buffer.rs:275-294](crates/apex-core/src/buffer.rs#L275-L294)).
 
+A `marked` buffer is dirty whatever its text. Acme's 1-2 and 1-3 chords, and its `Cut` and `Paste`, `filemark` the body's file before they act, so a cut of nothing still makes Put appear: the acme idiom for writing a clean window again (a file deleted on disk, or one `Putall` should include). `Node::mark` does the same for a clean, non-scratch file's body: it appends `BufferOp::Mark`, which sets `marked`. The client calls it for the B1 chords (and their ⌥/⌘ forms); the `Cut` and `Paste` built-ins call it too, but the keyboard's cut and paste do not. Only `Clean` (a load, Put, Get or a tool's `set_clean`) clears it; undo does not. A dump keeps it (`DumpBuffer::marked`), so a marked file is marked again when the session is loaded.
+
 Hashing a large text on every `dirty()` call would be slow, so the hash at a given version is cached in `Memo`, a mutex around `Option<(Version, String)>`. The cache is not part of the state. It is `#[serde(skip)]`, a clone starts empty, two memos always compare equal, and `hash_into` ignores it ([crates/apex-core/src/buffer.rs:69-91](crates/apex-core/src/buffer.rs#L69-L91)).
 
-Two entries change the flags:
+Three entries change the flags:
 
-- `BufferOp::Clean { version, disk_hash }` sets `clean_version`, replaces `disk_hash` and clears `stale`.
+- `BufferOp::Clean { version, disk_hash }` sets `clean_version`, replaces `disk_hash` and clears `stale` and `marked`.
+- `BufferOp::Mark` sets `marked`.
 - `BufferOp::Stale { disk_hash }` sets `stale` and records the new disk hash ([crates/apex-core/src/state.rs:630-640](crates/apex-core/src/state.rs#L630-L640)).
 
 These entries come from the server's file handling. When a watched file changes and the hash is not one the server wrote itself (`path_changed`), `content_changed` decides what to do. If the hash matches what the buffer already knows, or the buffer is clean and already holds that text, it does nothing. If the buffer is dirty, it proposes `Stale` (and proposes nothing if the buffer is already stale). If the buffer is clean, it proposes `SetContent` against the version it saw ([crates/apex-server/src/lib.rs:906-935](crates/apex-server/src/lib.rs#L906-L935)).
@@ -117,7 +121,7 @@ The leader applies `SetContent` as a whole-buffer `Edit`, made by `Node::set_con
 | `Create { name, text, disk_hash, kind, scratch }` | The first entry of a buffer's log. Fails with `Exists` if the buffer already exists. |
 | `Edit { version, q0, nd, text, group }` | `Buffer::edit`: splice, record for undo, version + 1 |
 | `Undo { version }` / `Redo { version }` | `Buffer::undo` / `redo`. Returns `Applied::UndoRange`. |
-| `Clean`, `Stale` | Disk-state flags, described above |
+| `Clean`, `Stale`, `Mark` | Disk-state flags, described above |
 | `Rename { name }` | Sets the name |
 | `ViewAdd` / `ViewDel { view }` | A text starts or stops showing the buffer |
 | `Select { view, q0, q1 }` | `set_select`, clamped to the text, with `q1 >= q0` |
