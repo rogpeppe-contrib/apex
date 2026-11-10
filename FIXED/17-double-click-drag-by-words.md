@@ -123,3 +123,20 @@ Taken in Apex built from the branch, on the text above (scaled 2x).
     `term_drag`.
   - The word rule is `apex_core::node::acme_isalnum` in
     `crates/apex-core/src/node.rs:148`.
+
+## Fix
+
+B1's drag state (`Drag` in `crates/apex-client/src/app.rs`) now carries a
+`base`, what the press selected, and a `unit`, what the sweep grows by:
+`apex_core::node::Unit::Char` for a plain click (base = the click point),
+`Unit::Word` after a double-click (base = `node::double_click`'s range).
+`mouse_move` and `autoscroll_step` both select `node::sweep(text, unit,
+base, pointer)`: by the word, the moving end goes to `node::word_end` /
+`node::word_start` of the pointer's offset (by `acme_isalnum`), or to the
+offset itself between words, and the selection never shrinks below the
+base, so jitter after a double-click no longer loses it. In a terminal,
+`mouse.term_dbl` holds the double-click's range and `term_word_sweep` does
+the same over the screen as `term_double_click` sees it (a new `TermText`
+shared by both), so words grow across soft wraps. Chords act on the grown
+selection as on any sweep. Issue 18 can add `Unit::Line`. The fix is in the
+commit that contains this section.

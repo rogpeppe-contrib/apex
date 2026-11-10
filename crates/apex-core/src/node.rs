@@ -142,6 +142,58 @@ pub fn double_click(t: &Text, q: usize) -> (usize, usize) {
     (q0, q1)
 }
 
+/// What a B1 sweep grows by: a plain sweep by the character; one held
+/// on from a double-click by the word, as other editors and terminals
+/// do (acme's own `textselect` sweeps by the character either way).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Unit {
+    Char,
+    Word,
+}
+
+/// The selection a B1 sweep makes with the pointer at `p`: from `base`,
+/// what the press selected (the click point for a plain click,
+/// `double_click`'s range for a double one), out to `p` in whole
+/// `unit`s. It never shrinks below `base`: with the pointer inside it,
+/// it is `base`. By the word, the moving end goes on to the end (or
+/// back to the start) of the word `p` is inside; between words, over
+/// blanks and punctuation, it is `p` itself.
+pub fn sweep(t: &Text, unit: Unit, base: (usize, usize), p: usize) -> (usize, usize) {
+    let (b0, b1) = base;
+    match unit {
+        Unit::Char => (b0.min(p), b1.max(p)),
+        Unit::Word if p > b1 => (b0, word_end(t, p)),
+        Unit::Word if p < b0 => (word_start(t, p), b1),
+        Unit::Word => base,
+    }
+}
+
+/// The end of the word `p` is inside (by `acme_isalnum`), or `p` when
+/// it is not inside one: after a word, before one, or between others.
+pub fn word_end(t: &Text, p: usize) -> usize {
+    let n = t.len();
+    let mut q = p.min(n);
+    if q == 0 || !acme_isalnum(t.char_at(q - 1)) {
+        return q;
+    }
+    while q < n && acme_isalnum(t.char_at(q)) {
+        q += 1;
+    }
+    q
+}
+
+/// The start of the word `p` is inside, or `p` when it is not inside one.
+pub fn word_start(t: &Text, p: usize) -> usize {
+    let mut q = p.min(t.len());
+    if q == t.len() || !acme_isalnum(t.char_at(q)) {
+        return q;
+    }
+    while q > 0 && acme_isalnum(t.char_at(q - 1)) {
+        q -= 1;
+    }
+    q
+}
+
 /// acme's `isalnum` (text.c): "hard to get absolutely right"; what is
 /// not a control, a space, ASCII punctuation (`_` is not), or in the
 /// Latin-1 control range is taken for part of a word.
@@ -2419,6 +2471,43 @@ mod click_tests {
         // name for the blanks of an xterm title): a word character, so
         // the name is still one word under a double-click
         assert!(acme_isalnum('␣'));
+    }
+
+    #[test]
+    fn a_sweep_from_a_double_click_goes_by_words() {
+        let t = Text::new("the quick brown fox jumps over (the lazy) dog, ok\n");
+        let quick = double_click(&t, 5);
+        assert_eq!(quick, (4, 9));
+        // inside the word, and at either edge of it: the word
+        for p in 4..=9 {
+            assert_eq!(sweep(&t, Unit::Word, quick, p), quick, "at {p}");
+        }
+        // on into "fox": to its end; just past its start too
+        assert_eq!(sweep(&t, Unit::Word, quick, 17), (4, 19));
+        assert_eq!(sweep(&t, Unit::Word, quick, 19), (4, 19));
+        // over the blank before "fox", or at its start: no further
+        assert_eq!(sweep(&t, Unit::Word, quick, 16), (4, 16));
+        // back into "the": to its start, keeping "quick"; just after its
+        // end, no further, as just before the start of "fox"
+        assert_eq!(sweep(&t, Unit::Word, quick, 1), (0, 9));
+        assert_eq!(sweep(&t, Unit::Word, quick, 2), (0, 9));
+        assert_eq!(sweep(&t, Unit::Word, quick, 3), (3, 9));
+        // a lone punctuation mark can still be reached
+        let dog = double_click(&t, 43);
+        assert_eq!(dog, (42, 45));
+        assert_eq!(sweep(&t, Unit::Word, dog, 46), (42, 46));
+        // a bracketed base stays whole, and grows past the bracket
+        let paren = double_click(&t, 32);
+        assert_eq!(paren, (32, 40));
+        assert_eq!(sweep(&t, Unit::Word, paren, 35), paren);
+        assert_eq!(sweep(&t, Unit::Word, paren, 43), (32, 45));
+        assert_eq!(sweep(&t, Unit::Word, paren, 28), (26, 40));
+        // a plain sweep is by the character
+        assert_eq!(sweep(&t, Unit::Char, (5, 5), 17), (5, 17));
+        assert_eq!(sweep(&t, Unit::Char, (10, 10), 1), (1, 10));
+        // the text's ends
+        assert_eq!((word_end(&t, 1000), word_start(&t, 1000)), (t.len(), t.len()));
+        assert_eq!(word_start(&t, 0), 0);
     }
 }
 

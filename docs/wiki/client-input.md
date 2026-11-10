@@ -46,7 +46,7 @@ There are two more ways in:
 
 | Press | Region | Effect |
 |---|---|---|
-| B1 | text | Select a caret, or a `double_click` expansion on a double click. Record `mouse.b1 = Drag{view, anchor}` and make this the active column. |
+| B1 | text | Select a caret, or a `double_click` expansion on a double click. Record `mouse.b1 = Drag{view, anchor, base, unit}` and make this the active column: `base` is what the press selected (the caret, or the expansion) and `unit` is what the sweep grows by (`node::Unit::Char`, or `Word` after a double click). |
 | B1 while B2 held | text | Set `chord_arg`, so the B2 command takes the last selection as its argument (acme's `textselect2`). |
 | B2 / B3 | text | Record `mouse.b2` / `mouse.b3`. B3 also records `b3_reverse` (shift) and `b3_cmd`. |
 | any | layout box | Record `box_drag`. The tiling op runs on release (acme's `coldragwin` / `rowdragcol`). |
@@ -55,7 +55,7 @@ There are two more ways in:
 | any | tag head atom | `press_atom`: the path, label and verbs of the tag's head. |
 | any | process pill in the session's tag (the top row's atoms) | `press_proc`. |
 | B1 | the session's own square, while a tool wants the user | `take_notification`: the oldest notification is taken and the pointer goes where it points. |
-| B1 | terminal cell | Start a client-side `term_sel`, or select a word, line or bracketed text on a double click (expanded from the cell boundary nearest the pointer, `TermLayout::boundary_at`, as `offset_at` rounds in text), and set `mouse.term_drag` either way. After a double click (`mouse.term_dbl` holds the cell pressed) the expansion stands until the pointer leaves that cell; then the drag sweeps from it, as in acme's `textselect`. |
+| B1 | terminal cell | Start a client-side `term_sel`, or select a word, line or bracketed text on a double click (expanded from the cell boundary nearest the pointer, `TermLayout::boundary_at`, as `offset_at` rounds in text), and set `mouse.term_drag` either way. After a double click, `mouse.term_dbl` holds the expansion, and the drag grows it by whole words, as in text (`term_word_sweep`, below). |
 | B2 / B3 | terminal cell | Start a `term_sweep` and draw it as `term_hl`. |
 | B1 | the top row past its text | `window.start_window_move()`, as on a title bar. |
 
@@ -65,7 +65,7 @@ The `Mouse` struct holds all of this per-gesture state: the three drags, `chorde
 
 ### Sweeps
 
-`mouse_move` extends whichever drag is live. For B1 it re-selects from the anchor to `offset_at(pos)` through `node.select`, so the selection is replicated as the user sweeps. If the pointer goes above or below the text, it starts acme's `framescroll`: a spawned task calls `autoscroll_step` every 80 ms. That scrolls by however many lines the pointer is past the edge and extends the selection to the text at that edge. As in acme, it scrolls down no further once the end of the text is in view (`TextLayout::end_shown`). Each loop carries a generation (`autoscroll_gen`), and a loop that is no longer the current one exits at its next tick, so recrossing the edge never leaves two loops running ([app.rs:3635-3793](crates/apex-client/src/app.rs#L3635-L3793), [app.rs:4187-4208](crates/apex-client/src/app.rs#L4187-L4208)).
+`mouse_move` extends whichever drag is live. For B1 it re-selects through `node.select` (`sweep_to`), so the selection is replicated as the user sweeps. What it selects is `node::sweep(text, unit, base, sweep_offset_at(pos))`: by the character, from the click point to the pointer; by the word (a drag held on from a double click), from the double click's range out to the end of the word the pointer is in (`node::word_end`), or back to its start (`node::word_start`), by `acme_isalnum`. Over blanks and punctuation the moving end is the pointer's offset itself. The selection never shrinks below `base`, so jitter after a double click leaves its word, brackets or line selected. acme's `textselect` instead sweeps by the character from the click point once the pointer has moved three pixels; Apex differs on purpose here. In a terminal, `term_word_sweep` does the same over the screen as `term_double_click` sees it (`TermText`: rows as lines, trailing blanks dropped, soft-wrapped rows joined), so words grow across a soft wrap. If the pointer goes above or below the text, it starts acme's `framescroll`: a spawned task calls `autoscroll_step` every 80 ms. That scrolls by however many lines the pointer is past the edge and extends the selection to the text at that edge. As in acme, it scrolls down no further once the end of the text is in view (`TextLayout::end_shown`). Each loop carries a generation (`autoscroll_gen`), and a loop that is no longer the current one exits at its next tick, so recrossing the edge never leaves two loops running ([app.rs:3635-3793](crates/apex-client/src/app.rs#L3635-L3793), [app.rs:4187-4208](crates/apex-client/src/app.rs#L4187-L4208)).
 
 B2 and B3 sweeps are not selections. They only set `self.hl = (view, lo, hi, HlKind::Exec | Look)`, which is drawn in that button's sweep colour. Scrollbar buttons repeat in the same way: one step at once, then after 200 ms one every 80 ms. Each step warps the pointer back onto the bar (`start_scrolling`, `scroll_step`: [app.rs:4115-4186](crates/apex-client/src/app.rs#L4115-L4186)).
 

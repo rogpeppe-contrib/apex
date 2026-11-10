@@ -13,7 +13,7 @@ use gpui::{
 
 use std::path::{Path, PathBuf};
 
-use apex_core::node::Erase;
+use apex_core::node::{Erase, Unit};
 use apex_core::tiling::{self, Info, SCROLLWID};
 use apex_core::*;
 use apex_server::proto::{ClientMsg, FileFrame, IoFrame, WindowEvent as PageEvent};
@@ -59,6 +59,17 @@ pub enum HlKind {
 struct Drag {
     view: ViewId,
     anchor: usize,
+    /// What B1's press selected, which its sweep grows from by `unit`
+    /// (`node::sweep`): the click point, or a double-click's word.
+    base: (usize, usize),
+    unit: Unit,
+}
+
+impl Drag {
+    /// A press at `off`, swept from by the character.
+    fn at(view: ViewId, off: usize) -> Drag {
+        Drag { view, anchor: off, base: (off, off), unit: Unit::Char }
+    }
 }
 
 /// A layout box being dragged: a window's or a column's.
@@ -93,10 +104,10 @@ struct Mouse {
     autoscroll: Option<(ViewId, i64)>,
     /// B1 held in a terminal: the selection follows the pointer.
     term_drag: Option<WindowId>,
-    /// B1 double-clicked in a terminal, the cell pressed: the word or
-    /// line it selected stands until the pointer leaves that cell, and
-    /// then a sweep from it replaces them, as in acme's `textselect`.
-    term_dbl: Option<(usize, u64)>,
+    /// B1 double-clicked in a terminal: the word or line it selected,
+    /// which the sweep grows from by whole words (`term_word_sweep`), as
+    /// a text window's does.
+    term_dbl: Option<((usize, u64), (usize, u64))>,
     /// The terminal sweep has copied (B2): the B3 after it is acme's
     /// paste back of what was cut, which leaves the shell alone.
     term_copied: bool,
@@ -3583,15 +3594,17 @@ impl Acme {
                 Region::Text(off) => {
                     self.typed_start.remove(&v);
                     self.node.activecol = self.column_of_view(v); // button 1 only
+                    let mut d = Drag::at(v, off);
+                    // a double-click's word (or brackets, or line): held,
+                    // the sweep grows from it a word at a time
                     if e.click_count >= 2 {
                         if let Some(t) = self.text_of(v) {
-                            let (a, z) = apex_core::node::double_click(&t, off);
-                            let _ = self.node.select(&mut self.log, v, a, z);
+                            d.base = apex_core::node::double_click(&t, off);
+                            d.unit = Unit::Word;
                         }
-                    } else {
-                        let _ = self.node.select(&mut self.log, v, off, off);
                     }
-                    self.mouse.b1 = Some(Drag { view: v, anchor: off });
+                    let _ = self.node.select(&mut self.log, v, d.base.0, d.base.1);
+                    self.mouse.b1 = Some(d);
                     self.mouse.chorded = false;
                 }
                 Region::Scrollbar => self.start_scrolling(Target::View(v), MouseButton::Left, e.position, window, cx),
@@ -3599,7 +3612,7 @@ impl Acme {
             },
             (Target::View(v), MouseButton::Middle) => match region {
                 Region::Text(off) => {
-                    self.mouse.b2 = Some(Drag { view: v, anchor: off });
+                    self.mouse.b2 = Some(Drag::at(v, off));
                     self.hl = None;
                 }
                 Region::Scrollbar => self.start_scrolling(Target::View(v), MouseButton::Middle, e.position, window, cx),
@@ -3607,7 +3620,7 @@ impl Acme {
             },
             (Target::View(v), MouseButton::Right) => match region {
                 Region::Text(off) => {
-                    self.mouse.b3 = Some(Drag { view: v, anchor: off });
+                    self.mouse.b3 = Some(Drag::at(v, off));
                     self.mouse.b3_reverse = e.modifiers.shift;
                     self.mouse.b3_cmd = Self::b3_cmd(e);
                     self.hl = None;
@@ -3630,8 +3643,9 @@ impl Acme {
                         // and the character before, and takes the brackets.
                         Some(l) => {
                             let ((c0, r0), (c1, r1)) = term_double_click(&l.rows, &l.wrapped, l.boundary_at(e.position), r);
-                            self.term_sel = Some((w, (c0, top + r0 as u64), (c1, top + r1 as u64)));
-                            self.mouse.term_dbl = Some(p);
+                            let base = ((c0, top + r0 as u64), (c1, top + r1 as u64));
+                            self.term_sel = Some((w, base.0, base.1));
+                            self.mouse.term_dbl = Some(base);
                         }
                         None => self.term_sel = Some((w, p, p)),
                     }
@@ -3855,18 +3869,14 @@ impl Acme {
                     let (c, r) = l.cell_at(pos);
                     let (cols, top) = (l.cols as usize, self.term_top(w));
                     let line = top + r as u64;
-                    let anchor = match self.mouse.term_dbl {
-                        Some(p) if p == (c, line) => None,
-                        Some(p) => {
-                            self.mouse.term_dbl = None;
-                            Some(p)
-                        }
-                        None => Some(anchor),
-                    };
-                    if let Some(anchor) = anchor {
+                    let sel = match self.mouse.term_dbl {
+                        Some(base) => term_word_sweep(&l.rows, &l.wrapped, top, base, (l.boundary_at(pos), r)),
                         // the end is exclusive: past the pointed-at cell when dragging forward
-                        let end = if (line, c) >= (anchor.1, anchor.0) { ((c + 1).min(cols), line) } else { (c, line) };
-                        self.term_sel = Some((w, anchor, end));
+                        None if (line, c) >= (anchor.1, anchor.0) => (anchor, ((c + 1).min(cols), line)),
+                        None => (anchor, (c, line)),
+                    };
+                    if self.term_sel != Some((w, sel.0, sel.1)) {
+                        self.term_sel = Some((w, sel.0, sel.1));
                         changed = true;
                     }
                 }
@@ -3879,7 +3889,7 @@ impl Acme {
                 let off = l.sweep_offset_at(pos);
                 let above = pos.y < l.bounds.top();
                 let below = pos.y > l.bounds.bottom();
-                let _ = self.node.select(&mut self.log, d.view, d.anchor.min(off), d.anchor.max(off));
+                self.sweep_to(d, off);
                 // acme's framescroll: keep scrolling while the pointer is outside
                 let want = if above { Some(-1) } else if below { Some(1) } else { None };
                 match want {
@@ -4395,9 +4405,17 @@ impl Acme {
             // a tag's pad is inside its edge: the pointer, off the card,
             // takes the sweep to the text's start or end
             let off = if l.padded { l.sweep_offset_at(pos) } else { l.offset_at(edge) };
-            let _ = self.node.select(&mut self.log, v, d.anchor.min(off), d.anchor.max(off));
+            self.sweep_to(d, off);
         }
         true
+    }
+
+    /// B1's sweep `d` with the pointer at `off`: what it selects, grown
+    /// from what the press selected by its unit.
+    fn sweep_to(&mut self, d: Drag, off: usize) {
+        let Some(t) = self.text_of(d.view) else { return };
+        let (a, z) = apex_core::node::sweep(&t, d.unit, d.base, off);
+        let _ = self.node.select(&mut self.log, d.view, a, z);
     }
 
     pub(crate) fn term_of(&self, w: WindowId) -> Option<TermId> {
@@ -4852,7 +4870,7 @@ impl Acme {
         };
         let new = kind.and_then(|k| match self.locate(pos) {
             Some((Target::View(v), Region::Text(off))) => {
-                let d = Drag { view: v, anchor: off };
+                let d = Drag::at(v, off);
                 let (a, z) = match self.explicit_range_at(d) {
                     Some((_, r)) => r,
                     None => {
@@ -4910,7 +4928,7 @@ impl Acme {
             return;
         }
         let swept = match self.mouse.b1 {
-            Some(Drag { view, anchor }) => self.node.state.buffer(match self.node.view_buffer(view) {
+            Some(Drag { view, anchor, .. }) => self.node.state.buffer(match self.node.view_buffer(view) {
                 Ok(b) => b,
                 Err(_) => return,
             }).map(|b| {
@@ -6001,31 +6019,82 @@ impl TermLine {
 /// window's click is between characters. A row the terminal soft-wrapped
 /// (`wrapped`) runs on into the next, blanks and all, as one line.
 fn term_double_click(rows: &[String], wrapped: &[bool], c: usize, r: usize) -> ((usize, usize), (usize, usize)) {
-    let wraps = |i: usize| wrapped.get(i).copied().unwrap_or(false);
-    let lines: Vec<&str> = rows.iter().enumerate().map(|(i, s)| if wraps(i) { s.as_str() } else { s.trim_end() }).collect();
-    let mut starts = Vec::with_capacity(lines.len());
-    let mut text = String::new();
-    let mut at = 0;
-    for (i, l) in lines.iter().enumerate() {
-        if i > 0 && !wraps(i - 1) {
-            text.push('\n');
-            at += 1;
-        }
-        starts.push(at);
-        text.push_str(l);
-        at += l.chars().count();
-    }
-    if lines.is_empty() {
+    let t = TermText::of(rows, wrapped);
+    if t.starts.is_empty() {
         return ((c, r), (c, r));
     }
-    let r = r.min(lines.len() - 1);
-    let q = starts[r] + c.min(lines[r].chars().count());
-    let (q0, q1) = apex_core::node::double_click(&apex_core::Text::new(&text), q);
-    let cell = |o: usize| {
-        let row = starts.iter().rposition(|&s| s <= o).unwrap_or(0);
-        (o - starts[row], row)
-    };
-    (cell(q0), cell(q1))
+    let (q0, q1) = apex_core::node::double_click(&t.text, t.offset(c, r));
+    (t.cell(q0), t.cell(q1))
+}
+
+/// A sweep held on from a double-click in a terminal: `node::sweep` by
+/// the word over the screen as `term_double_click` sees it, from `base`,
+/// what the double-click selected, to the pointer at boundary `p.0` of
+/// row `p.1`. Cells are (column, line), `top` the line of the first row,
+/// the end exclusive.
+fn term_word_sweep(rows: &[String], wrapped: &[bool], top: u64, base: ((usize, u64), (usize, u64)), p: (usize, usize)) -> ((usize, u64), (usize, u64)) {
+    let t = TermText::of(rows, wrapped);
+    if t.starts.is_empty() {
+        return base;
+    }
+    let line = |(c, r): (usize, usize)| (c, top + r as u64);
+    let before = |a: (usize, u64), b: (usize, u64)| (a.1, a.0) < (b.1, b.0);
+    let o = t.offset(p.0, p.1);
+    let at = line(t.cell(o));
+    if before(base.1, at) {
+        (base.0, line(t.cell(apex_core::node::word_end(&t.text, o))))
+    } else if before(at, base.0) {
+        (line(t.cell(apex_core::node::word_start(&t.text, o))), base.1)
+    } else {
+        base
+    }
+}
+
+/// A terminal's screen as a text window's text, for its selections: the
+/// rows as lines, each without the blanks after its text; a row the
+/// terminal soft-wrapped (`wrapped`) runs on into the next, blanks and
+/// all, as one line.
+struct TermText {
+    text: apex_core::Text,
+    /// Where each row starts in `text`, and how long it is there.
+    starts: Vec<usize>,
+    lens: Vec<usize>,
+}
+
+impl TermText {
+    fn of(rows: &[String], wrapped: &[bool]) -> TermText {
+        let wraps = |i: usize| wrapped.get(i).copied().unwrap_or(false);
+        let mut starts = Vec::with_capacity(rows.len());
+        let mut lens = Vec::with_capacity(rows.len());
+        let mut text = String::new();
+        let mut at = 0;
+        for (i, row) in rows.iter().enumerate() {
+            let l = if wraps(i) { row.as_str() } else { row.trim_end() };
+            if i > 0 && !wraps(i - 1) {
+                text.push('\n');
+                at += 1;
+            }
+            starts.push(at);
+            lens.push(l.chars().count());
+            text.push_str(l);
+            at += l.chars().count();
+        }
+        TermText { text: apex_core::Text::new(&text), starts, lens }
+    }
+
+    /// The place in the text of the boundary before column `c` of row
+    /// `r`: past the end of a row's text is at its end. There must be
+    /// a row.
+    fn offset(&self, c: usize, r: usize) -> usize {
+        let r = r.min(self.starts.len() - 1);
+        self.starts[r] + c.min(self.lens[r])
+    }
+
+    /// The cell, (column, row), at place `o` in the text.
+    fn cell(&self, o: usize) -> (usize, usize) {
+        let row = self.starts.iter().rposition(|&s| s <= o).unwrap_or(0);
+        (o - self.starts[row], row)
+    }
 }
 
 /// Is the cell `p` within the selection `a`..`b` (either way round)?
@@ -6146,7 +6215,7 @@ mod tab_ring_tests {
 
 #[cfg(test)]
 mod term_double_click_tests {
-    use super::term_double_click;
+    use super::{term_double_click, term_word_sweep};
 
     fn rows(lines: &[&str]) -> Vec<String> {
         // as the screen has them: every row the terminal's width
@@ -6194,6 +6263,34 @@ mod term_double_click_tests {
         assert_eq!(term_double_click(&screen, &wrapped, 0, 0), ((0, 0), (0, 2)), "the line, both rows of it");
         // the newline after a row that is not wrapped still ends the word
         assert_eq!(term_double_click(&screen, &wrapped, 1, 2), ((0, 2), (4, 2)));
+    }
+
+    #[test]
+    fn a_sweep_from_a_double_click_in_a_terminal_goes_by_words() {
+        // lines from 100 on: the cells' lines are the history's
+        let screen = rows(&["the quick brown fox", "jumps (over) it"]);
+        let at = |((c0, r0), (c1, r1)): ((usize, usize), (usize, usize))| ((c0, 100 + r0 as u64), (c1, 100 + r1 as u64));
+        let quick = at(term_double_click(&screen, &[], 5, 0));
+        assert_eq!(quick, ((4, 100), (9, 100)));
+        let sweep = |p| term_word_sweep(&screen, &[], 100, quick, p);
+        // inside the word: the word
+        assert_eq!(sweep((7, 0)), quick);
+        // on into "fox", and back into "the"
+        assert_eq!(sweep((17, 0)), ((4, 100), (19, 100)));
+        assert_eq!(sweep((1, 0)), ((0, 100), (9, 100)));
+        // onto the next line, and past the end of the first
+        assert_eq!(sweep((2, 1)), ((4, 100), (5, 101)));
+        assert_eq!(sweep((30, 0)), ((4, 100), (19, 100)));
+        // a bracketed base stays whole
+        let over = at(term_double_click(&screen, &[], 7, 1));
+        assert_eq!(over, ((7, 101), (11, 101)));
+        assert_eq!(term_word_sweep(&screen, &[], 100, over, (9, 1)), over);
+        assert_eq!(term_word_sweep(&screen, &[], 100, over, (14, 1)), ((7, 101), (15, 101)));
+        // a word across a soft wrap is taken whole
+        let screen: Vec<String> = ["echo one t", "wo three", "next"].iter().map(|l| format!("{l:<10}")).collect();
+        let one = ((5, 100), (8, 100));
+        assert_eq!(term_word_sweep(&screen, &[true, false, false], 100, one, (10, 0)), ((5, 100), (2, 101)));
+        assert_eq!(term_word_sweep(&screen, &[true, false, false], 100, one, (1, 1)), ((5, 100), (2, 101)));
     }
 }
 

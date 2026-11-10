@@ -145,6 +145,18 @@ the selection takes the whole selection. B2 and B3 sweeps are drawn in
 their own colours (orange for B2, blue for B3), and what B2 ran blinks
 briefly so that you can see it.</p>
 
+<p>A B1 double-click selects as in acme: next to a bracket or quote,
+what it encloses; at either end of a line, the line; otherwise the word.
+Unlike acme, keeping B1 down after the double-click and dragging grows
+that selection a whole word at a time, as most editors and terminals
+do: forward to the end of the word under the pointer, or back to its
+start. Over blanks and punctuation it follows the pointer to the
+character. The double-clicked text always stays selected, so a small
+twitch of the mouse doesn't lose it. This works the same in bodies, tags
+and terminals; in a terminal, a word that wraps onto the next row counts
+as one word. A drag after a single click still sweeps character by
+character.</p>
+
 <p>Chords work as in acme. While holding B1 after a sweep, click B2 to
 cut, or B3 to paste. As in acme, either chord in a file's window marks
 it changed even when there is nothing to cut or paste, so a 1-2 chord
