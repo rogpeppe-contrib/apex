@@ -129,3 +129,17 @@ assert `size().0` ≥ ~9 500 for a setting of 10 000) would stop this coming bac
   limit is usually exceeded "by dozens to a hundred or so lines", but I measured
   a few hundred *under* 10 000. Also, a setting below one page (e.g. 1000 at 40
   columns gives 528) is raised to at least one page. Neither matters much.
+
+## Fix
+
+`apex_vt_new` in `crates/ghostty-vt-sys/src/shim.c` now also sets
+`GHOSTTY_TERMINAL_OPT_SCROLLBACK_MAX_BYTES` to NULL, which removes the byte
+limit. The line limit from `Newterm.scrollback` is then the only one, and it
+also bounds memory (about lines × cols cells). A new test in
+`crates/ghostty-vt-sys/src/lib.rs`
+(`the_scrollback_keeps_the_lines_it_is_asked_to_whatever_the_width`) writes
+20 000 lines at 80, 200 and 400 columns, and again after halving the width.
+It checks that about 10 000 lines are kept each time (9 555–9 988 measured),
+and that a lower setting still holds. In the GUI, after `seq 1 20000` in a
+half-width terminal the oldest line is now 10105 (it was 1064 after `seq 1 2000`).
+The fix is in the commit that moved this file to FIXED/.
