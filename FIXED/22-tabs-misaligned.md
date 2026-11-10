@@ -89,3 +89,19 @@ file (bottom), where it lines up:
   `tabstop × width('0')` in pixels from the line's left edge, as
   libframe does. Mapping clicks and selections back from x to text
   position would also need to know those widths.
+
+## Fix
+
+Text windows and tags now lay tabs out as acme's libframe does: each
+tab is shaped as one space and then widened to the next tab stop, a
+multiple of `tabstop` × the width of '0' in the window's font, counted
+from the start of its row (a tab already on a stop goes to the next;
+one that would be narrower than a space, or reach past the row's end,
+is a space wide). A line with tabs is shaped unwrapped and wrapped
+afterwards by `tab_layout` (gpui's wrapping rules), so each wrapped
+row's tabs count from where it starts. The glyph positions themselves
+are moved (`retab` in `crates/apex-client/src/text_element.rs`), so
+clicks, sweeps, the caret and selections agree with what is drawn. A
+body's tab stops come from its window's `tabstop` (`Tab n`), now passed
+through `Source::tabstop`; tags keep 4. The fix is in the commit that
+moved this file to FIXED/.

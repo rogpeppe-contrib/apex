@@ -2962,6 +2962,7 @@ impl Acme {
         };
         let buf = self.node.state.buffer(b).ok()?;
         let v = buf.view(view);
+        let tabstop = view.window().and_then(|w| self.node.state.window(w).ok()).map_or(crate::text_element::TABSTOP, |w| w.tabstop.max(1) as usize);
         let (mono, dirty, stale, live, pulse) = match view {
             ViewId::Body(w) | ViewId::Tag(w) => {
                 let win = self.node.state.window(w).ok()?;
@@ -3024,6 +3025,7 @@ impl Acme {
                 kind: Kind::of(view),
                 head: None,
                 mono,
+                tabstop,
                 dirty,
                 stale,
                 live,
@@ -3058,6 +3060,7 @@ impl Acme {
                 _ => None,
             },
             mono,
+            tabstop,
             dirty,
             stale,
             live,
