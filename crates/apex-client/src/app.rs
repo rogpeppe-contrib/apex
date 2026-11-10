@@ -581,10 +581,9 @@ pub struct Acme {
     /// A selection in a terminal, client-side: the window, and two
     /// positions (column, history line), the end exclusive.
     pub term_sel: Option<(WindowId, (usize, u64), (usize, u64))>,
-    /// The snarf buffer as it was when a terminal copy was requested.
-    snarf_wanted: Option<String>,
-    /// Texts programs put on the clipboard (OSC 52), to be written once
-    /// there is a context to write with.
+    /// Texts for the clipboard (OSC 52, a tool's snarf, a terminal copy
+    /// this UI asked for), to be written once there is a context to
+    /// write with.
     clips: Vec<String>,
     /// A B2/B3 sweep in a terminal, shown in the button's colour.
     pub term_hl: Option<(WindowId, MouseButton, (usize, u64), (usize, u64))>,
@@ -1334,9 +1333,10 @@ impl Acme {
 
     fn snarf_output(&mut self, transcript: &str) -> Result<Option<WindowId>, String> {
         let Some(out) = apex_core::transcript::last_output(transcript) else { return Err("Snarfout: no earlier prompt to tell the output by".into()) };
-        // into the snarf buffer, and the clipboard once it lands
-        self.snarf_wanted = Some(self.node.state.layout.snarf.clone());
-        let _ = self.node.append(&mut self.log, Shard::Layout, Op::Layout(LayoutOp::Snarf { text: out }));
+        // into the snarf buffer, and the clipboard however the snarf
+        // buffer stood
+        let _ = self.node.append(&mut self.log, Shard::Layout, Op::Layout(LayoutOp::Snarf { text: out.clone() }));
+        self.clips.push(out);
         self.sync();
         Ok(None)
     }
@@ -1922,7 +1922,6 @@ impl Acme {
             restarting: false,
             choosing: false,
             term_sel: None,
-            snarf_wanted: None,
             clips: Vec::new(),
             term_hl: None,
             term_ran: None,
@@ -4499,12 +4498,16 @@ impl Acme {
 
     /// The text of terminal `t` from `p0` to `p1` (column, history line;
     /// the end exclusive) to the snarf buffer and the clipboard: the
-    /// server has the scrollback.
+    /// server has the scrollback. A daemon answers with the snarf and,
+    /// to this UI alone, a `Clipboard`, so the clipboard is written even
+    /// when the snarf buffer already held the text.
     fn term_snarf(&mut self, t: TermId, p0: (u16, u64), p1: (u16, u64), cx: &mut Context<Self>) {
-        self.snarf_wanted = Some(self.node.state.layout.snarf.clone());
         match &mut self.backend {
             Backend::Local(server) => {
                 if let Some(p) = server.term_text(t, p0, p1) {
+                    if let Proposal::Snarf { text } = &p {
+                        self.clips.push(text.clone());
+                    }
                     perform(&mut self.node, &mut self.log, vec![p]);
                 }
             }
@@ -4542,19 +4545,11 @@ impl Acme {
         }
     }
 
-    /// A terminal copy is waiting for the server's text: once the snarf
-    /// buffer changes, the clipboard gets it too.
+    /// Texts that came for the clipboard (`clips`) to the clipboard:
+    /// the last one set wins.
     pub fn settle_snarf(&mut self, cx: &mut Context<Self>) {
-        // OSC 52 from a terminal: the last text set wins
         if let Some(text) = self.clips.drain(..).last() {
             cx.write_to_clipboard(ClipboardItem::new_string(text));
-        }
-        if let Some(prev) = &self.snarf_wanted {
-            let s = &self.node.state.layout.snarf;
-            if s != prev {
-                cx.write_to_clipboard(ClipboardItem::new_string(s.clone()));
-                self.snarf_wanted = None;
-            }
         }
     }
 

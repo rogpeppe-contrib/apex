@@ -133,3 +133,19 @@ and it can't pick up another UI's snarf by mistake.
   clipboard.
 - Related: issue 21 (terminal chords), issue 26 (typing over a selection
   snarfs it, which goes through `App::snarf` and is not affected).
+
+## Fix
+
+As the issue proposed. The daemon's `ClientMsg::TermText` handler
+(`crates/apex-server/src/daemon.rs`) now also sends
+`ServerMsg::Clipboard { text }` to the UI that asked, and to no other UI
+on the session. In the client (`crates/apex-client/src/app.rs`),
+`term_snarf` with the in-process backend pushes the `Proposal::Snarf`
+text onto `clips` itself, `snarf_output` (Snarfout) pushes its output
+onto `clips`, and `snarf_wanted` with its comparison in `settle_snarf`
+is gone: `settle_snarf` just writes the last of `clips`. So every
+terminal copy writes the clipboard, whatever the snarf buffer held, and
+a stale wait can no longer catch another UI's snarf. Test:
+`a_terminal_copy_reaches_the_copiers_clipboard_alone` in
+`crates/apex-server/tests/socket.rs`. The commit is the one containing
+this section.

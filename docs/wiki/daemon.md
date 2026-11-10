@@ -185,7 +185,7 @@ sequenceDiagram
 - **A UI leads.** The proposal is sent to the UI as `ServerMsg::Propose { id: pid, … }`. The UI's later `ClientMsg::Applied` is accepted only from the current leader, and `answered(pid, result)` passes it back to the tool under the tool's own id.
 - **No UI.** `proposal::apply(&mut view, &mut log, p)` runs right away. The daemon calls `after` *before* answering, so the tool's replica already has, for example, the window its proposal made by the time it hears `Applied`.
 
-There is one special case. A non-UI connection's `Proposal::Snarf` is also sent as `ServerMsg::Clipboard` to every UI on the session, as a terminal's OSC 52 is (`daemon.rs:932-944`).
+There is one special case. A non-UI connection's `Proposal::Snarf` is also sent as `ServerMsg::Clipboard` to every UI on the session, as a terminal's OSC 52 is (`daemon.rs:932-944`). A `TermText` copy sends its `Clipboard` to the UI that asked, and to no other.
 
 ### Appends from the leader
 
@@ -216,7 +216,7 @@ Every message other than the session-level ones is handled by `in_session`. If t
 | Messages | What the daemon does |
 |---|---|
 | `TermKey`, `TermPaste`, `TermType`, `TermResize`, `TermClear`, `TermFocus`, `TermScroll` | Passed to the `Server`'s terminal hosts. Their output comes back as entries on the term shard (see [Terminals](terminals.md)). |
-| `TermText`, `TermFind`, `TermRead` | Selection text becomes a `Snarf` proposal. Find replies `TermFound`, and read replies `TermLines`. |
+| `TermText`, `TermFind`, `TermRead` | Selection text becomes a `Snarf` proposal, and a `ServerMsg::Clipboard` to the asking UI alone. Find replies `TermFound`, and read replies `TermLines`. |
 | `OpenFile`, `EditOver` | `Server::open_file` becomes an `OpenWindow` proposal (with `cover` set for `EditOver`), or an `Errors` proposal on failure. |
 | `Plumb` | `plumb_start` begins a walk, then `drive` carries it out. |
 | `Ask`, `Answer` | A question about a window is routed to the window's owner with a 2 s `ASK_ANSWER` timeout. Answers are matched to a `tool_plumbs` or `asks` entry. |

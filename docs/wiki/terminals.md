@@ -304,7 +304,7 @@ The client never writes to a term shard. It sends these `ClientMsg`s, which the 
 | `TermPaste`, `TermType` | `term_paste`, `term_type` |
 | `TermResize` | `term_resize`, sent from the client's prepaint when the cell grid size changes |
 | `TermScroll { delta, at }` | `term_wheel`: with a cell, the wheel; without one, the scrollbar |
-| `TermText`, `TermRead` | Text of a selection (answered with a `Snarf` proposal) or of history lines |
+| `TermText`, `TermRead` | Text of a selection (answered with a `Snarf` proposal, and a `Clipboard` to the asker alone) or of history lines |
 | `TermFind` | Look in the terminal; answered by `TermFound` |
 | `TermFocus`, `TermClear` | Focus reports; `Clear` drops the scrollback and the marks |
 | `ClientConfig { term: TermColors }` | From a UI only: the ink, paper and 16 ANSI colours that OSC 4/10/11 queries are answered from |
