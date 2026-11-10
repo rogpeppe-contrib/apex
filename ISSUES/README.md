@@ -18,7 +18,7 @@ and a pointer to the likely code.
 | 10 | [B3 on a soft-wrapped file name in a terminal doesn't open it](10-term-plumb-wrapped-filename.md) | bug |
 | 11 | [B1-B2 chord with null selection doesn't make the window puttable](11-chord-null-selection-put.md) | bug |
 | 12 | [Double-click just before a closing bracket in a terminal doesn't match](../FIXED/12-double-click-before-close-paren.md) | **fixed**: a terminal double-click expands from the character boundary nearest the pointer, as in text windows |
-| 13 | [The file name in the tag can't be selected or copied](13-tag-filename-select-copy.md) | bug |
+| 13 | [The file name in the tag can't be selected or copied](../FIXED/13-tag-filename-select-copy.md) | **fixed**: Copy/Cut/Paste work in the rename field; the 1-2 chord on the path snarfs it |
 | 14 | [Starting a daemon removes a live daemon's socket](../FIXED/14-daemon-removes-live-socket.md) | **fixed**: a daemon refuses to start on a path another daemon serves, and removes its socket on exit only if it is still its own |
 | 15 | [Escape does not cut a non-empty selection](../FIXED/15-escape-on-selection.md) | **fixed**: Esc cuts a non-empty selection (with snarf), so a second Esc after typing cuts the typed text |
 | 16 | [Selection autoscroll runs past the end of text and speeds up](../FIXED/16-selection-autoscroll-overrun.md) | **fixed**: autoscroll below a body stops once the end of the text is in view, and recrossing the edge no longer starts extra scroll loops |

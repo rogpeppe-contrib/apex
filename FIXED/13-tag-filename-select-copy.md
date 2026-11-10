@@ -116,3 +116,20 @@ it, and a later paste gave `short`.
   This did not happen again on a clean retry, so it may have been leftover
   button state from earlier xdotool input (an Alt modifier had got stuck in
   the nested server at one point). I haven't confirmed it.
+
+## Fix
+
+- The Edit menu's Cut, Copy, Paste, Select All and Undo (Ctrl-X/C/V on
+  Linux, ⌘ on the Mac) now go to the field that has the keyboard when that
+  is a field in place: the tag's rename field (path or label), the path
+  picker's or the directory picker's query, or the session's name. They
+  used to go to the text under the pointer. (`Acme::has_field`,
+  `overlay_field`, `menu_edit`, `menu_command`.)
+- The 1-2 chord on the path in the tag (B1 on the name or a folder, then
+  B2 while B1 is held; or ⌥ while B1 is held) snarfs the path up to the
+  part pressed (the whole path from the name) into the snarf buffer and the
+  clipboard, and puts away the picker the B1 press opened
+  (`Acme::snarf_head`, `head_b1`). The breadcrumb head itself is unchanged:
+  there is still no sweep-to-select of part of the name.
+
+The fix is in the commit that moved this file to FIXED/.

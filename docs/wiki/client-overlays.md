@@ -98,7 +98,7 @@ A key that reaches no overlay is sent to the page under the pointer, or to the t
 
 A mouse press anywhere closes them, again in a fixed order ([app.rs:3339-3387](crates/apex-client/src/app.rs#L3339-L3387)). `url_edit`, `session_edit`, `session_menu`, `picker`, `cwd_picker` and `completion` are dropped, `tag_edit` is committed (`tag_edit_commit`), and the press goes on as usual. A press that closes `commands`, `finder`, `quick` or `selector` is used up by the close and does nothing else. Clicks on rows still work because each panel calls `stop_propagation` on its own mouse-down, so the press never reaches `mouse_down`.
 
-The Edit menu's actions (⌘X ⌘C ⌘V ⌘A ⌘Z) arrive as actions before any key event. `menu_edit` sends them to `overlay_edit` when the selector, finder, url field, palette or quick open is up ([app.rs:5177-5183](crates/apex-client/src/app.rs#L5177-L5183)). `overlay_edit` asks `overlay_field()` for the field that has the keyboard. It checks the selector (or its new-host form), then `url_edit`, `commands`, `finder` and `quick`, and applies paste (first line of the clipboard, trimmed), select-all, copy, cut or undo to that field. If the text changed, it calls `overlay_changed`, which resets the list ([shell.rs:1420-1500](crates/apex-client/src/shell.rs#L1420-L1500)). The tag field and the two folder pickers are missing from both checks, which the review below points out. `overlay_up`, the test used to keep pages from taking keys while something is up, does list them (and `quick`), but not `completion` ([app.rs:4427-4431](crates/apex-client/src/app.rs#L4427-L4431)).
+The Edit menu's actions (⌘X ⌘C ⌘V ⌘A ⌘Z) arrive as actions before any key event. `menu_edit` sends them to `overlay_edit` when `has_field()` says a one-line field has the keyboard: the selector, finder, url field, palette or quick open, or a field in place, the tag field, the path or cwd picker's query, or the session's name. `menu_command` sends Select All (`Edit ,`) the same way. `overlay_edit` asks `overlay_field()` for the field that has the keyboard. It checks the selector (or its new-host form), then `url_edit`, `commands`, `finder`, `quick`, `tag_edit`, `picker`, `cwd_picker` and `session_edit`, and applies paste (first line of the clipboard, trimmed), select-all, copy, cut or undo to that field. If the text changed, it calls `overlay_changed`, which resets the list (for a picker, its cursor back to the top) ([shell.rs](crates/apex-client/src/shell.rs)). `overlay_up`, the test used to keep pages from taking keys while something is up, does list them (and `quick`), but not `completion` ([app.rs:4427-4431](crates/apex-client/src/app.rs#L4427-L4431)).
 
 Sources: [app.rs:4961-5115](crates/apex-client/src/app.rs#L4961-L5115), [app.rs:3339-3387](crates/apex-client/src/app.rs#L3339-L3387), [app.rs:5177-5183](crates/apex-client/src/app.rs#L5177-L5183), [app.rs:4427-4431](crates/apex-client/src/app.rs#L4427-L4431), [shell.rs:1420-1500](crates/apex-client/src/shell.rs#L1420-L1500)
 
@@ -247,7 +247,10 @@ flowchart LR
     B -->|"B1 on Dir or Name"| P["open_path_picker"]
     B -->|"B3 on Dir(k) or Name"| L["look(path up to there)"]
     P -->|"second click within DOUBLE (500 ms)"| E
+    P -->|"B2 while B1 held (head_b1)"| S["snarf_head: path up to there to snarf and clipboard; picker closed"]
 ```
+
+The B1 press on a folder or the name also records `head_b1`, cleared when B1 comes up or goes down again. While it is set, a B2 press is the 1-2 chord: `chord` calls `snarf_head`, which puts the path up to the part pressed (the whole path for the name, a folder's with its trailing slash) in the snarf buffer (`LayoutOp::Snarf`) and on the clipboard, and puts away the picker the press opened. Nothing is cut: the path is the window's name, not tag text.
 
 ### The field
 
@@ -310,7 +313,7 @@ Its proposal is a single `ListPicker` with:
 
 The two folder pickers would then become one source with different pick actions ([ARCHITECTURE.md:279-301](ARCHITECTURE.md#L279-L301)).
 
-The review also counts 14 separate `Option` overlay fields, each with hand-written "is one up?" checks that disagree with each other: `overlay_up`, the key routing, `menu_edit`, `menu_command` and `overlay_field`. It notes four or more copies of caret blinking at 500 or 530 ms, most of which ignore View ▸ Blink Cursor. A likely consequence, which the review did not confirm by running the app: ⌘C and ⌘V while the tag field, path picker or cwd picker is open go to the text under the pointer. The checks quoted above bear this out, since `menu_edit` and `overlay_field` do not list `tag_edit`, `picker` or `cwd_picker`.
+The review also counts 14 separate `Option` overlay fields, each with hand-written "is one up?" checks that disagree with each other: `overlay_up`, the key routing, `menu_edit`, `menu_command` and `overlay_field`. It notes four or more copies of caret blinking at 500 or 530 ms, most of which ignore View ▸ Blink Cursor. One consequence was that ⌘C and ⌘V while the tag field, path picker or cwd picker was open went to the text under the pointer, since `menu_edit` and `overlay_field` did not list `tag_edit`, `picker` or `cwd_picker`; `has_field()` now gives `menu_edit` and `menu_command` one list.
 
 The proposed fix is one `Option<Overlay>`, or a small stack of them, behind a trait with `key`, `field`, `edit`, `render` and `bounds`. Together with "one blink clock" and "one navigation path", this is part of the planned client cleanups ([ARCHITECTURE.md:303-324](ARCHITECTURE.md#L303-L324), [ARCHITECTURE.md:928-935](ARCHITECTURE.md#L928-L935)).
 
