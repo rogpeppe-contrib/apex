@@ -124,3 +124,14 @@ text:
   bounds (`autoscroll_step`, app.rs about line 4222), which picks the
   offset at the pointer's x on the tag's bottom edge. That does the same
   thing, so it would need the same change.
+
+## Fix
+
+`TextLayout` (crates/apex-client/src/text_element.rs) gained
+`sweep_offset_at`, which is `offset_at` except that a tag's pad clamp only
+applies while the pointer is within the tag's bounds; off the card, above or
+below, the offset is the text's start or end, as for bodies and acme's
+`frcharofpt`. The B1 drag and B2/B3 sweeps in `mouse_move`, and
+`autoscroll_step` for tags, use it (crates/apex-client/src/app.rs). A press,
+or a drag that stays on the pad, still counts as the nearest row. The fix is
+in the commit containing this section.
