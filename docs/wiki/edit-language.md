@@ -1,6 +1,6 @@
 # The Edit Language (apex-edit)
 
-`apex-edit` is apex's implementation of acme's `Edit` command: sam's structural-regular-expression command language (`,x/foo/ c/bar/`, `/re/;/re2/p`, `s/a/b/g`, `{ … }` blocks and so on), plus the Plan 9 regular expressions it uses. It is a line-by-line port of plan9port's `src/cmd/acme/{regx.c, edit.c, ecmd.c, elog.c}`. It is also a **pure** library. It reads a rune-indexed text, runs a program, and returns a description of what should happen: a list of changes in original coordinates, the new dot, the printed output, any warnings, and *intents* for commands that touch the world (files, shell pipes, undo). The caller decides how to carry those out.
+`apex-edit` is apex's implementation of acme's `Edit` command: sam's structural-regular-expression command language (`,x/foo/ c/bar/`, `/re/;/re2/p`, `s/a/b/g`, `{ … }` blocks and so on), plus the Plan 9 regular expressions it uses. It is a line-by-line port of plan9port's `src/cmd/acme/{regx.c, edit.c, ecmd.c, elog.c}`. It is also a **pure** library. It reads a rune-indexed text, runs a program, and returns a description of what should happen: a list of changes in original coordinates, the new dot, the printed output, any warnings, and *intents* for commands that act on the session (undo, opening and closing windows). The caller decides how to carry those out. The file and shell commands (`< | > e r w f`) reach the world through a `Host` the caller supplies, called synchronously as the program reaches each one, so a program's commands happen in its order, as in acme.
 
 The crate has no dependencies on the rest of apex (only `thiserror`), so you can test it against the reference implementation, plan9port's `sam`. Inside apex the main caller is the [node](node.md). `Node::run_edit` runs a program over a window's body and lowers the resulting changes into buffer entries in one undo group (see [Buffers, Views and Undo](buffers-and-text.md) for the rope text that implements the crate's `Text` trait). The [apex command](cli.md) also uses it directly for `apex text read -addr`.
 
@@ -35,7 +35,9 @@ flowchart TD
     EX --> RX
     EX --> EL["Elog: insert / delete / replace"]
     EX --> OUT["output (p, =)"]
-    EX --> INT["intents (u w r e f b B D < | >)"]
+    EX --> INT["intents (u B D)"]
+    EX --> H["Host: run, read, write (< | > e r w B <cmd)"]
+    H --> EL
     EL --> FIN["Elog::finish (merge, reverse)"]
     FIN --> CH["changes"]
     CH --> DOT["adjust_dot"]
@@ -56,7 +58,13 @@ pub fn run(&mut self, text: &dyn Text, dot: (usize, usize),
            name: Option<&str>, program: &str) -> Result<Outcome>
 ```
 
-`dot` is clamped to the text. `name` is the buffer's file name. `=` prints it as a prefix, and `w`, `r` and `e` use it as their default file. `run` parses one command at a time and executes it, then finishes the log and adjusts dot. Any error aborts the whole run with acme's message, and no changes are returned.
+```rust
+pub fn run_with(&mut self, text: &dyn Text, dot: (usize, usize),
+                name: Option<&str>, program: &str,
+                host: &mut dyn Host) -> Result<Outcome>
+```
+
+`dot` is clamped to the text. `name` is the buffer's file name. `=` prints it as a prefix, and `w`, `r` and `e` use it as their default file. `run` parses one command at a time and executes it, then finishes the log and adjusts dot. Any error aborts the whole run with acme's message, and no changes are returned. (acme applies the changes made before an error; apex applies none.) `run` is `run_with` and `NoHost`, whose every file and shell command fails.
 
 The `Outcome` has these fields ([crates/apex-edit/src/exec.rs:71-95](crates/apex-edit/src/exec.rs#L71-L95)):
 
@@ -67,30 +75,46 @@ The `Outcome` has these fields ([crates/apex-edit/src/exec.rs:71-95](crates/apex
 | `output: Vec<Printed>` | What `p` (`Printed::Text`) and `=` (`Printed::Address`, with a newline) printed, in order. `output_string()` concatenates them the way acme shows them in `+Errors` |
 | `intents: Vec<Intent>` | Effects for the caller to carry out |
 | `warnings: Vec<String>` | acme's `warning: changes out of sequence`, at most once |
+| `clean: Option<bool>` | What the file commands left the buffer as against its file: `Some(true)` clean (acme's `editclean` after `e`, or `r` of its own file over all of it; or `w` of all of it to its own file with nothing changed in the program), `Some(false)` changed (only part of it written to its own file) |
+| `name: Option<String>` | The name `e` or `f` gave the buffer |
 
 Because the changes are ordered from the end of the text backwards, applying them in sequence keeps every later change's coordinates valid. `apex_edit::apply` does exactly that ([crates/apex-edit/src/lib.rs:76-83](crates/apex-edit/src/lib.rs#L76-L83)).
 
-### Intents
+### The host and intents
 
-Commands with effects never act. They push an `Intent` ([crates/apex-edit/src/exec.rs:39-60](crates/apex-edit/src/exec.rs#L39-L60)):
+The file and shell commands call the `Host` ([crates/apex-edit/src/exec.rs](crates/apex-edit/src/exec.rs)), a port of acme's `runpipe`, `loadfile` and `putfile`:
 
-| Command | Intent | Notes |
+| Method | Used by |
+|---|---|
+| `path(name)` | Every file name a program gives (acme's `dirname`): the host makes it absolute, relative to the window's directory. The default leaves it alone |
+| `modified()` | `f`, to print `'` for a modified buffer |
+| `run(cmd, input) -> Ran { out, errors }` | `<`, `\|`, `>`, and `B <cmd` / `D <cmd` (acme's `filelist`). `errors` (stderr, `name: exit N`) is printed |
+| `read(path)` | `r`, `e` |
+| `write(path, text)` | `w` |
+
+| Command | What it does | Notes |
 |---|---|---|
-| `u [n]` | `Undo { n }` | Negative `n` redoes. A missing count defaults to 1 |
-| `w [name]` | `Write { name, q0, q1 }` | Defaults to the whole file. Errors with "can't write file with pending modifications" if the program has already changed the text |
-| `r [name]` | `Read { name, q0, q1 }` | Replace the range with the file |
-| `e [name]` | `Load { name }` | Replace the whole buffer |
-| `f [name]` | `SetName { name }` | |
-| `b name` | `Browse { name }` | |
-| `B list` | `Open { list }` | |
-| `D [list]` | `Delete { list }` | Empty means the current window |
-| `<`, `\|`, `>` cmd | `Pipe { kind, cmd, q0, q1 }` | `PipeKind::From`, `Through` and `To`. Dot is set to the range |
+| `\|cmd` | Runs `cmd` with the range on stdin; the output replaces the range in the log | Dot is set to the range, so it covers the output |
+| `<cmd` | The same, with no input | |
+| `>cmd` | Runs `cmd` with the range on stdin; the output is printed (to `+Errors`) | |
+| `r [name]` | The range replaced with the file | `NUL bytes elided` warning, as acme |
+| `e [name]` | The whole buffer replaced with the file; the buffer takes its name | Clean if it was its own file. The caller asks first if the buffer is modified (acme's `winclean`) |
+| `w [name]` | The range (default all) written to the file | "can't write file with pending modifications" if the program already changed the text |
+| `f [name]` | Renames the buffer; prints acme's `pfilename` line (`'+. name`) | |
+| `u [n]` | `Intent::Undo { n }` | Negative `n` redoes |
+| `B list` | `Intent::Open { names }` | No window is current afterwards: later commands fail with "no current window", as in acme |
+| `D [list]` | `Intent::Delete { names }` | Empty means the current window |
+| `b name` | Fails: "b command is not supported" | A program edits one window's text |
 
-`X` and `Y` (loops over files) fail with "X command is not supported". apex has no file menu.
+`X` and `Y` (loops over files) fail with "X command is not supported". apex has no file menu. `commands(program)` parses a program without running it and lists its commands, nested ones too; `WORLDLY` lists the ones that need a host.
 
 ### How the node uses a run
 
-`Node::run_edit` ends any typing in progress, reads the body's buffer name, dot and text, and calls `self.edit.run`. It then turns each change into an `edit_op` in a fresh undo group, appends a `Select` of the new dot, and carries out `Undo` intents itself by calling `undo` or `redo` `|n|` times. The remaining intents, the output string and the warnings go back to the caller as an `EditRun` ([crates/apex-core/src/node.rs:1780-1813](crates/apex-core/src/node.rs#L1780-L1813)). The [node page](node.md) covers what happens to them next. The CLI's `apex text read -addr A WIN` runs the program `Ap` with a fresh `Edit`, using the window's current selection as dot and its path as the name, and prints `output_string()` ([crates/apex-cli/src/main.rs:1499-1524](crates/apex-cli/src/main.rs#L1499-L1524)).
+`Node::run_edit` ends any typing in progress, reads the body's buffer name, dot and text, and calls `self.edit.run`. It then turns each change into an `edit_op` in a fresh undo group, appends a `Select` of the new dot, and carries out `Undo` intents itself by calling `undo` or `redo` `|n|` times. The remaining intents, the output string and the warnings go back to the caller as an `EditRun`. The [node page](node.md) covers what happens to them next.
+
+The leader has no world to give a program, so a program with any of the `WORLDLY` commands is the server's: `Node::resolve` makes `Edit` with one (`Node::edit_is_servers`) a `Handler::Server` exec, and the leader never runs any of it. The [server](server.md) runs the whole program on a thread of its own with an `EditHost`: commands run as B2 runs them (rc, `$%`/`$samfile`/`$winid`, the window's directory, recorded as the session's processes while they run), names resolve in the window's directory, and `w` refuses once to write over a file changed under the buffer, as `Put` does. When the program ends, its output goes to the directory's `+Errors` and its changes to the leader as `Proposal::EditDone`, which `Node::apply_edit` makes as one undo step only if the body is still at the version the program ran over; then `SetPath` for a name `e` or `f` gave, `OpenWindow` for each `B` file and `Exec Del` for each `D` window. `u` is refused in such a program before anything runs, since the leader's history is not the server's to undo. Before recording an `Edit` with `e`, `Node::exec` asks `winclean`, as for `Get`. The server keeps an `Edit` of its own, so `//` in a server-run program refers to the last pattern of the programs the server ran.
+
+The CLI's `apex text read -addr A WIN` runs the program `Ap` with a fresh `Edit`, using the window's current selection as dot and its path as the name, and prints `output_string()` ([crates/apex-cli/src/main.rs:1499-1524](crates/apex-cli/src/main.rs#L1499-L1524)).
 
 Sources: [crates/apex-edit/src/exec.rs:28-137](crates/apex-edit/src/exec.rs#L28-L137), [crates/apex-edit/src/exec.rs:260-336](crates/apex-edit/src/exec.rs#L260-L336), [crates/apex-core/src/node.rs:1780-1813](crates/apex-core/src/node.rs#L1780-L1813), [crates/apex-cli/src/main.rs:1499-1524](crates/apex-cli/src/main.rs#L1499-L1524)
 

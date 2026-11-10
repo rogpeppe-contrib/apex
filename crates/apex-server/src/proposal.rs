@@ -76,6 +76,13 @@ pub enum Proposal {
     /// acme's `|` leaves the output selected), or a tool's write, which
     /// leaves dot alone as a write to acme's `data` file does.
     ReplaceRange { select: bool, dir: Option<String>, buffer: BufferId, version: Version, q0: usize, q1: usize, text: String },
+    /// An Edit program the server ran over a window's body (one with file
+    /// or shell commands): its changes, in original coordinates and in
+    /// application order, made as one undo step only if the body is still
+    /// at `version`, and its dot. The buffer is then clean with `clean` on
+    /// disk (`e`, `w` of all of it), or marked changed (`mark`: part of it
+    /// written to its file).
+    EditDone { window: WindowId, version: Version, changes: Vec<(usize, usize, String)>, dot: (usize, usize), clean: Option<String>, mark: bool },
     /// Text for `dir`'s errors window (acme's errorwin), or the session's.
     Errors { dir: Option<String>, text: String },
     /// The outcome of an exec.
@@ -289,6 +296,10 @@ pub fn apply(node: &mut Node, log: &mut Log, p: Proposal) -> Result<Option<Windo
                 }
                 return Err(CoreError::Missing(format!("buffer {buffer} changed meanwhile: at version {}, the write was for {version}", node.state.buffer(buffer).map(|b| b.version).unwrap_or(version))));
             }
+            Ok(None)
+        }
+        Proposal::EditDone { window, version, changes, dot, clean, mark } => {
+            node.apply_edit(log, window, version, &changes, dot, clean, mark)?;
             Ok(None)
         }
         Proposal::Errors { dir, text } => {

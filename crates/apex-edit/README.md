@@ -23,13 +23,16 @@ assert_eq!(out.dot, (4, 8));              // acme's rule: the merged change is s
 
 `run` returns the changes in application order, the new dot, what `p` and
 `=` printed (as a list, `output_string()` joins it the way acme's `+Errors`
-shows it), acme's warnings, and *intents* for commands that have effects
-(`u w r e f b B D < | >`), which the caller carries out.
+shows it), acme's warnings, and *intents* for commands that act on the
+session (`u B D`), which the caller carries out. `run_with` takes a `Host`
+for the file and shell commands (`< | > e r w f`), called as the program
+reaches each one, as acme's `runpipe`, `loadfile` and `putfile` are.
 
 ## Tests
 
 - `tests/golden.rs`: feature-by-feature acceptance tests with acme's error
   messages.
+- `tests/host.rs`: the file and shell commands, through a fake `Host`.
 - `tests/sam_diff.rs`: differential tests against plan9port's `sam -d`, the
   reference implementation of the language: a corpus of texts × programs,
   then generated programs and regular expressions over random texts.
@@ -68,4 +71,7 @@ follows **acme**. The harness knows these divergences:
   `NSTACK` nesting) are dynamic; acme fails with "regexp list overflow" or
   "expression too long" past them.
 - `X` and `Y` (loops over files) are not supported: apex has no file menu.
+  Nor is `b`: a program edits one window's text.
+- An error applies none of a program's changes; acme applies those made
+  before it.
 - File addresses (`"regexp"`) and the mark (`'`) are errors, as `'` is in acme.

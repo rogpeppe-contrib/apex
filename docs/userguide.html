@@ -245,8 +245,18 @@ to <code>cmd</code>, its output to <code>+Errors</code>.</p>
 
 <p><code>Edit</code> takes the sam command language, as in acme, with
 Plan 9 regular expressions: <code>Edit ,x/foo/c/bar/</code>. The file and
-pipe commands (<code>e</code>, <code>w</code>, <code>|</code>, and so on)
-are not supported yet; neither are <code>X</code> and <code>Y</code>.</p>
+shell commands work as in acme: <code>|cmd</code> replaces the text with
+what <code>cmd</code> makes of it (<code>Edit ,|sort</code>),
+<code>&lt;cmd</code> replaces it with <code>cmd</code>'s output,
+<code>&gt;cmd</code> sends it to <code>cmd</code> and shows the output in
+<code>+Errors</code> (<code>Edit ,&gt;diff $% -</code> shows a window's
+unsaved changes), and <code>w</code>, <code>r</code>, <code>e</code>,
+<code>f</code>, <code>B</code> and <code>D</code> write, read, load and
+name files and open and close windows. The commands run as B2 runs them,
+with <code>$%</code> naming the window's file, in its directory, and the
+program waits for each before going on. <code>u</code> can't be used in
+the same program as these, and <code>b</code>, <code>X</code> and
+<code>Y</code> are not supported.</p>
 
 <p>⌘⇧P opens a palette of every command you might run in the window
 under the pointer: the words in its tag, the commands its tools offer,

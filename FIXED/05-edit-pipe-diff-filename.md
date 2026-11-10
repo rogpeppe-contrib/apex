@@ -87,3 +87,22 @@ Running `Edit ,>diff $% -` from the tag of a modified window:
   and then reports failure.
 - Known limitation, documented in docs/userguide.html (around line 222):
   "The file and pipe commands (e, w, |, and so on) are not supported yet".
+
+## Fix
+
+An `Edit` program with file or shell commands (`< | > e r w f b B D`) is
+now the server's: `Node::resolve` sends it there (`Node::edit_is_servers`)
+instead of running it on the leader, so a program that can't run is never
+partly applied. The server runs the whole program on a thread of its own.
+apex-edit gained a `Host` trait (`run`, `read`, `write`, `path`), which it
+calls synchronously as the program reaches each command, as acme's
+`runpipe`/`loadfile`/`putfile`. The server's `EditHost` runs commands as
+B2 does: rc, `$%`/`$samfile`/`$winid`, in the window's directory, listed
+as the session's processes. The program's changes come back as
+`Proposal::EditDone`, which the leader applies as one undo step only if
+the body is still at the version the program ran over.
+`|`, `<`, `>`, `w`, `r`, `e`, `f`, `B` and `D` are implemented (`B`/`D`
+take `<cmd` lists too). Not done: `b` (a program edits one window's text;
+it fails with "b command is not supported"). `u` is refused in a program
+with file or shell commands, before anything runs. `!` is not an acme Edit
+command. The fix is in the commit that contains this file.
