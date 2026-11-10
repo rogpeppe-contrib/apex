@@ -24,6 +24,19 @@
   own LICENSE). A tab whose session wants the user draws it before the
   name (`shell::pjw`), tinted by gpui like any other SVG.
 
+- `keyboard/keyboard`: plan9port's `lib/keyboard`, unchanged, as of
+  plan9port commit `1f1396913fb5372408f442ed26933f5ae4b399cd` (the
+  file last changed in `d25d0ca1a368`). MIT licence: plan9port's
+  LICENSE, copied unchanged as `keyboard/LICENSE`. It is the table of
+  compose sequences (`"o` for ö, `<=` for ≤) typed after a tap of Alt;
+  `compose.rs` includes it and reads it as plan9port's `mklatinkbd`
+  does. Its SHA-256 is
+  `3859a0320f547a01537b2c217f23296bef6688c4e040a3af9860cbb7aaabee9f`.
+
+  To update: fetch
+  `https://raw.githubusercontent.com/9fans/plan9port/master/lib/keyboard`
+  and change the commit and hash here.
+
 - `mermaid.min.js.gz`: [Mermaid](https://mermaid.js.org) 12.0.0,
   `dist/mermaid.min.js` from the npm package, gzipped (`gzip -9 -n`).
   MIT licence. Previews draw ```` ```mermaid ```` blocks with it; the

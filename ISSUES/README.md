@@ -9,7 +9,7 @@ and a pointer to the likely code.
 | 01 | [Terminal: B1 sweep ignored when it starts soon after a click](../FIXED/01-term-click-drag.md) | **fixed**: a drag after a double-click in a terminal sweeps from the press point, as in text windows |
 | 02 | [Renaming a window in its tag is discarded unless you press Return](../FIXED/02-tag-title-edit-not-persisted.md) | **fixed**: a tag rename or label edit is committed when you click elsewhere or run a command; only Esc cancels |
 | 03 | [B1 dragged below a tag stops at the pointer's column, not the tag's end](../FIXED/03-tag-drag-down-selection.md) | **fixed**: a sweep dragged below a tag runs to the end of its text (above it, to its start), as in acme |
-| 04 | [Support acme's Alt compose sequences for typing Unicode](04-unicode-compose-input.md) | feature |
+| 04 | [Support acme's Alt compose sequences for typing Unicode](../FIXED/04-unicode-compose-input.md) | **fixed**: a lone Alt tap starts a plan9port compose sequence (`"o` ö, `<=` ≤, `X2265` ≥) in bodies, tags, fields and terminals |
 | 05 | [Edit's pipe and file commands are not implemented (`Edit ,>diff $% -`)](../FIXED/05-edit-pipe-diff-filename.md) | **fixed**: Edit's `\| < >`, `w r e f`, `B D` work as in acme, run by the server in program order; `b` is still unsupported |
 | 06 | [Paste chord (B1-B3) on the window's name in the tag does nothing](../FIXED/06-paste-chord-tag-filename.md) | **fixed**: the 1-3 chord on the path renames the window to the snarf; chords cut and paste in the rename field |
 | 07 | [B2 on the window's path in the tag does nothing](../FIXED/07-execute-text-in-tag-filename.md) | **fixed**: B2 on the tag's path (name or any folder) executes the window's whole name, as acme's B2 on the name does; B2-B1 adds the selection |

@@ -102,3 +102,21 @@ Every sequence came out literally:
 - References: plan9port `lib/keyboard`, `src/cmd/devdraw/latin1.c`
   (`mklatinkbd` makes `latin1.h`); Plan 9 `/lib/keyboard`,
   `/sys/src/9/port/latin1.c`; keyboard(6).
+
+## Fix
+
+Implemented as plan9port does it. Pressing and releasing Alt alone, with
+no key, button or other modifier in between, starts a compose sequence
+(`Acme::alt_tapped`, called from `modifiers_changed`). A second tap or a
+click cancels it. While it is pending, `key_down` collects printable keys
+and asks `compose::step` (new `crates/apex-client/src/compose.rs`) what
+they make. `compose.rs` reads plan9port's `lib/keyboard` (vendored with
+its MIT LICENSE in `crates/apex-client/assets/keyboard/`) the way
+`mklatinkbd` does, and matches as devdraw's `latin1` does: `X`, `XX` or
+`XXX` take 4, 5 or 6 hex digits. The character goes on as one typed key
+through the new `key_typed`, so it reaches bodies, tags, every field and
+terminals (as UTF-8 to the program). A key that matches nothing types
+the collected keys literally, as devdraw does. Escape drops the sequence.
+Alt+key stays Meta in terminals, and the ⌥ chords and ⌥-click are
+unchanged. The feature is enabled on macOS too, as plan9port's Mac
+devdraw has it. The commit is the one that contains this section.

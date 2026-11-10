@@ -339,6 +339,22 @@ colour and blinks; other carets are plain.</p>
 <tr><td>⌘X ⌘C ⌘V ⌘A</td><td>cut, copy, paste, select all</td></tr>
 </table>
 
+<p>To type a character that is not on the keyboard, do as in Plan 9:
+press and let go ⌥ (Alt) on its own, then type a short sequence for the
+character: <code>"o</code> for ö, <code>&lt;=</code> for ≤,
+<code>-&gt;</code> for →, <code>*a</code> for α, <code>no</code> for ¬.
+Or type <code>X</code> and four hex digits for any character by its code
+point: <code>X2265</code> for ≥ (<code>XX</code> and five digits, or
+<code>XXX</code> and six, reach beyond U+FFFF). The sequences are
+plan9port's, listed in its <code>lib/keyboard</code> (and
+keyboard(7)). Nothing shows while a sequence is under way; the character
+appears when it is complete. A key that no sequence goes on with types
+the keys as they were, Escape drops the sequence, and so do another tap
+of ⌥ and a click. It works wherever you type: bodies, tags, the fields
+(the rename field, ⌘P, the pickers) and terminals, where the character
+goes to the program. ⌥ held with a key or a button is unchanged: Meta in
+a terminal, B2 for a click, a chord while sweeping.</p>
+
 <p>Menu commands act on the window under the pointer:</p>
 <table>
 <tr><td>⌘S ⌘R ⌘W</td><td>Put, Get, Del</td></tr>
