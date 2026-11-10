@@ -11,7 +11,7 @@ and a pointer to the likely code.
 | 03 | [B1 dragged below a tag stops at the pointer's column, not the tag's end](../FIXED/03-tag-drag-down-selection.md) | **fixed**: a sweep dragged below a tag runs to the end of its text (above it, to its start), as in acme |
 | 04 | [Support acme's Alt compose sequences for typing Unicode](04-unicode-compose-input.md) | feature |
 | 05 | [Edit's pipe and file commands are not implemented (`Edit ,>diff $% -`)](05-edit-pipe-diff-filename.md) | feature (missing acme behaviour) |
-| 06 | [Paste chord (B1-B3) on the window's name in the tag does nothing](06-paste-chord-tag-filename.md) | bug |
+| 06 | [Paste chord (B1-B3) on the window's name in the tag does nothing](../FIXED/06-paste-chord-tag-filename.md) | **fixed**: the 1-3 chord on the path renames the window to the snarf; chords cut and paste in the rename field |
 | 07 | [B2 on the window's path in the tag does nothing](../FIXED/07-execute-text-in-tag-filename.md) | **fixed**: B2 on the tag's path (name or any folder) executes the window's whole name, as acme's B2 on the name does; B2-B1 adds the selection |
 | 08 | [A web window's header has no Del; Ctrl+W over the page does nothing](../FIXED/08-cannot-delete-web-window.md) | **fixed**: the web header has the tag's × (Del), and Ctrl+W closes the web window over its header or its page |
 | 09 | [Button 2 in a Term window's scrollbar does nothing](../FIXED/09-term-scrollbar-middle-button.md) | **fixed**: B2 in a Term scrollbar jumps and drags, as in text windows |

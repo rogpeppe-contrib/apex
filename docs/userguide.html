@@ -345,7 +345,13 @@ the path to rename the window's file: the new name takes effect on
 Return or as soon as you click elsewhere, and Escape cancels; Cut, Copy
 and Paste work in the field. To copy the path, chord on it: press B1 on
 the name and click B2 (or press ⌥ while B1 is held), and the whole path goes to the snarf buffer and the
-clipboard (on a folder, the path up to that folder). B2 on the path,
+clipboard (on a folder, the path up to that folder). To rename the
+window by pasting a name, press B1 on the path and click B3 (or press ⌘
+while B1 is held): the window's whole name is replaced by the snarf
+buffer, a relative name being taken in the window's folder, as if typed in
+the rename field (a snarf of more than one line is ignored). In the rename
+field itself, B1 held with B2 cuts the field's selection and with B3
+pastes over it. B2 on the path,
 on the name or any folder, executes the window's whole name, as B2 on the
 name in acme's tag does: a script's window runs that script, its output in
 the folder's +Errors; click B1 while B2 is held to give it the selection as

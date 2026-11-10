@@ -119,3 +119,24 @@ changes nothing, then B3 closes it with nothing pasted:
   second line is clipped and drawn over the row below:
 
   ![multi-line paste clipped in a tag](images/06-multiline-paste-clipped.png)
+
+## Fix
+
+- The 1-3 chord on the path in the tag (B1 on the name or any folder, then
+  B3 while B1 is held; or ⌘ while B1 is held) renames the window to the
+  snarf buffer at once, as acme's paste over the swept name does. The
+  whole name is replaced (the breadcrumb has no sweep over part of it).
+  The snarf is trimmed, a relative name is taken in the window's folder,
+  and the rename goes through the same `Proposal::SetPath` the rename
+  field commits (`Acme::paste_head`, `rename_to`). An empty or multi-line
+  snarf does nothing. The picker the B1 press opened is put away, and B3
+  no longer plumbs the folder in this case. Steps 3, 4 and 5 all give a
+  rename to the snarf. Inserting at a click inside the name (step 4's
+  `notSENTINELes.txt`) isn't supported: the head isn't text.
+- In the rename field, B1 held there with B2 cuts the field's selection
+  and with B3 pastes the snarf over it, as Ctrl-X/Ctrl-V do (`TagEdit::b1`,
+  `tag_edit_chord`). The field stays open. A B1 sweep still doesn't select
+  in the field: the selection is set with the keyboard, starting with the
+  stem that the double-click selects.
+
+The fix is in the commit that moved this file to FIXED/.
