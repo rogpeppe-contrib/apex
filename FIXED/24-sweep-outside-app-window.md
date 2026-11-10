@@ -143,3 +143,17 @@ slowest scroll, one line per tick, and can't speed it up.
   tracking resumes at once.
 - Related: FIXED/16-selection-autoscroll-overrun.md. Its "Notes" and "Fix"
   sections already point out this case as not fixed.
+
+## Fix
+
+`crates/apex-client/src/main.rs` (the root view's `render`) adds a zero-size
+`canvas` whose paint registers a raw `window.on_mouse_event::<MouseMoveEvent>`
+listener. In the bubble phase, for a move with a button held
+(`pressed_button.is_some()`) whose position lies outside the window's viewport,
+it calls `Acme::mouse_move`. Moves inside the window still come only through
+the root's `on_mouse_move`, so none is delivered twice. Body sweeps now
+autoscroll below and above the window, faster the further out the pointer is,
+and follow vertical motion off either side. B2/B3 sweeps, terminal drags and
+scrollbar drags follow the pointer there too. Releasing outside still ends the
+drag. Verified in Xephyr with the steps above. The fix is in the commit that
+contains this section.
