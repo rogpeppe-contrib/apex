@@ -8,7 +8,7 @@ and a pointer to the likely code.
 |---|-------|------|
 | 01 | [Terminal: B1 sweep ignored when it starts soon after a click](01-term-click-drag.md) | bug |
 | 02 | [Renaming a window in its tag is discarded unless you press Return](02-tag-title-edit-not-persisted.md) | bug |
-| 03 | [B1 drag down in a terminal can't select whole lines](03-drag-down-selection-partial-line.md) | bug |
+| 03 | [B1 dragged below a tag stops at the pointer's column, not the tag's end](03-tag-drag-down-selection.md) | bug |
 | 04 | [Support acme's Alt compose sequences for typing Unicode](04-unicode-compose-input.md) | feature |
 | 05 | [Edit's pipe and file commands are not implemented (`Edit ,>diff $% -`)](05-edit-pipe-diff-filename.md) | feature (missing acme behaviour) |
 | 06 | [Paste chord (B1-B3) on the window's name in the tag does nothing](06-paste-chord-tag-filename.md) | bug |
@@ -29,5 +29,5 @@ and a pointer to the likely code.
 | 21 | [B1-B2-B3 chord in a terminal types the selection at the prompt](21-term-chord-cut-paste-copies.md) | bug |
 | 22 | [Tab-separated columns don't line up in the proportional font](22-tabs-misaligned.md) | bug |
 
-Related groups: 02, 06, 07, 13, 20 (the tag's name area); 01, 03, 10, 12, 21 (terminal
-mouse handling); 12, 17, 18, 19 (double-click expansion).
+Related groups: 02, 06, 07, 13, 20 (the tag's name area); 01, 10, 12, 21 (terminal
+mouse handling); 03, 16 (B1 sweeps past the edge of the text); 12, 17, 18, 19 (double-click expansion).
