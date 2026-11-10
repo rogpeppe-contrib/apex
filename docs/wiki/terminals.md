@@ -63,6 +63,8 @@ unsafe impl Send for Terminal {}
 
 `Terminal` is `Send` because the library keeps no global state and starts no threads. Every call takes the handle.
 
+The flags are bold (1), italic (2) and underline (4), plus `FLAG_WRAP` (8) on a row's last cell when the terminal soft-wrapped that row, read from the row's `GHOSTTY_ROW_DATA_WRAP`. The client uses it to treat a wrapped line as one line: B2 and B3 words (`TermLine` in `app.rs`), double-click, and swept text (`term_grid_text`) run across the wrap, and only a real newline ends a line.
+
 ### What the shim exposes
 
 | C function | Rust wrapper | What it does |

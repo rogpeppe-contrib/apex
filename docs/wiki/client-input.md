@@ -95,7 +95,7 @@ After `node.exec`, `Cut` and `Snarf` copy the session's snarf to the system clip
 
 For B3, `look_at` sends a `PlumbReq` or a `ClientMsg::Plumb`. It carries the text, `at` (the anchor as a `Span`), `sel` (only when the range was explicit), the `reverse` flag (shift-B3) and an optional verb. Command-B3 sends verb `Def` (the LSP's rule), and shift-command-B3 runs `Back`. A real B3 counts as command-B3 when ⌘ is held. A ⌘-click stand-in counts only when control is held too (`b3_cmd`) ([app.rs:4758-4770](crates/apex-client/src/app.rs#L4758-L4770), [app.rs:5608-5623](crates/apex-client/src/app.rs#L5608-L5623)). The server does the expansion and the plumbing walk, as described in [Plumbing Rules and Verbs](plumbing.md).
 
-Terminal sweeps end the same way, from the grid text. A B2 inside a terminal selection takes the selection, and the span that ran is drawn for a moment as `term_ran`. A plain B3 click prefers an OSC 8 link, then a whole `http(s)://` URL, then a file word, and plumbs it through `look`.
+Terminal sweeps end the same way, from the grid text. A B2 inside a terminal selection takes the selection, and the span that ran is drawn for a moment as `term_ran`. A plain B3 click prefers an OSC 8 link, then a whole `http(s)://` URL, then a file word, and plumbs it through `look`. These expansions work on the line through the clicked row, so a word the terminal soft-wrapped onto the next row is taken whole (`TermLine`, from the shard's `FLAG_WRAP`); a sweep across a soft wrap gets no newline there.
 
 ### The ⌘/⌥ hint
 

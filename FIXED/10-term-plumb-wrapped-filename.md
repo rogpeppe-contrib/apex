@@ -100,3 +100,18 @@ B3 sweep across both rows, held (step 7), and the result after release:
   soft wraps, since its formatter can unwrap; that it exposes a per-row flag
   through the render-state API is unchecked), or have the client ask the
   server for the logical line.
+
+## Fix
+
+The terminal now tells the client which rows it soft-wrapped. The shim
+(`crates/ghostty-vt-sys/src/shim.c`, `apex_vt_snapshot`) reads each row's
+`GHOSTTY_ROW_DATA_WRAP` bit and sets a new cell flag, `FLAG_WRAP` (8,
+`crates/apex-server/src/term.rs`), on the row's last cell; it travels in the
+existing `Cell::flags`, so the wire format is unchanged. The client keeps a
+per-row `wrapped` list in `TermLayout`, and a new `TermLine` in
+`crates/apex-client/src/app.rs` joins a row with the rows it wraps into and
+from. B3 (`term_word`, `term_url`, `term_man`) and B2 (`term_word_at`, whose
+span can now cross rows) expand over that joined line; `term_grid_text` puts
+no newline (and keeps the blanks) at a soft wrap, so sweeps and Send get the
+line as written; `term_double_click` joins wrapped rows likewise. The fix is
+in the commit that contains this section.

@@ -15,7 +15,7 @@ and a pointer to the likely code.
 | 07 | [B2 on the window's path in the tag does nothing](../FIXED/07-execute-text-in-tag-filename.md) | **fixed**: B2 on the tag's path (name or any folder) executes the window's whole name, as acme's B2 on the name does; B2-B1 adds the selection |
 | 08 | [A web window's header has no Del; Ctrl+W over the page does nothing](../FIXED/08-cannot-delete-web-window.md) | **fixed**: the web header has the tag's × (Del), and Ctrl+W closes the web window over its header or its page |
 | 09 | [Button 2 in a Term window's scrollbar does nothing](../FIXED/09-term-scrollbar-middle-button.md) | **fixed**: B2 in a Term scrollbar jumps and drags, as in text windows |
-| 10 | [B3 on a soft-wrapped file name in a terminal doesn't open it](10-term-plumb-wrapped-filename.md) | bug |
+| 10 | [B3 on a soft-wrapped file name in a terminal doesn't open it](../FIXED/10-term-plumb-wrapped-filename.md) | **fixed**: B2/B3 words, double-click and sweeps in a terminal run across a soft wrap, so a wrapped file name opens |
 | 11 | [B1-B2 chord with null selection doesn't make the window puttable](../FIXED/11-chord-null-selection-put.md) | **fixed**: a B1 chord (or Cut/Paste) in a clean file's body marks it changed, so Put appears even when nothing was cut |
 | 12 | [Double-click just before a closing bracket in a terminal doesn't match](../FIXED/12-double-click-before-close-paren.md) | **fixed**: a terminal double-click expands from the character boundary nearest the pointer, as in text windows |
 | 13 | [The file name in the tag can't be selected or copied](../FIXED/13-tag-filename-select-copy.md) | **fixed**: Copy/Cut/Paste work in the rename field; the 1-2 chord on the path snarfs it |
