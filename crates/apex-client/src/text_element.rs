@@ -399,8 +399,8 @@ pub fn paint_work(window: &mut Window, c: Point<Pixels>, r: f32, width: f32, ink
 
 /// Material's spinner (Google's): an arc of radius `r` round `c` whose
 /// head races round ahead and whose tail then catches it up, the whole
-/// turning the while (the window is drawn again each tick while anything
-/// spins).
+/// turning the while: the window drawn again, frame after frame, for as
+/// long as it is drawn, and no longer.
 pub fn paint_spinner(window: &mut Window, c: Point<Pixels>, r: f32, width: f32, ink: Hsla) {
     let ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|t| t.as_millis()).unwrap_or(0);
     let (tail, head) = hare(ms);
@@ -421,6 +421,7 @@ pub fn paint_spinner(window: &mut Window, c: Point<Pixels>, r: f32, width: f32, 
         let e = at(a);
         window.paint_quad(fill(Bounds::new(point(e.x - px(w), e.y - px(w)), size(px(width), px(width))), ink).corner_radii(px(w)));
     }
+    window.request_animation_frame();
 }
 
 /// Material's spinner's chase, `ms` into it: where its tail and head are,

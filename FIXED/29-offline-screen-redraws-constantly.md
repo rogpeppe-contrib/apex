@@ -155,3 +155,26 @@ countdown text changes.
   whatever `apex` was first on `PATH` (an older build) as the daemon on the
   isolated socket. That is a side effect of how I broke the daemon on
   purpose, not part of this bug.
+
+## Fix
+
+The 100 ms tick in `Acme::over` (app.rs) no longer notifies just because
+`waiting` is set. `paint_spinner` (text_element.rs) now calls
+`window.request_animation_frame()` as it draws, as `paint_dot`'s `spin`
+already did, so a spinner keeps turning exactly while it is on screen (the
+waiting page's while a link is coming, and the standing chip's) and no
+longer. `link_tick` (standing.rs) remembers the countdown text it last drew
+(`Acme::retry_shown`) and reports a change only when `retry_said()` differs,
+i.e. once a second.
+
+Measured the same way (gdb dprintf on `current_title`, 10 s, Xephyr/llvmpipe):
+
+| State | Before | After |
+|---|---|---|
+| "Apex quit while reopening…", picker open | 119 frames, 102% CPU | 25 frames, 21% |
+| Same, picker closed | 103 frames, 58% | 5 frames, 3% |
+| Link lost, "Trying again in N s." | 98 frames, 55% | 10 frames, 6% |
+
+While a link is coming the spinner still turns (now at the display's frame
+rate rather than 10 a second), and the countdown still steps each second.
+The commit is the one containing this section.

@@ -34,7 +34,7 @@ and a pointer to the likely code.
 | 26 | [Typing over a selection does not put the replaced text in the snarf buffer](../FIXED/26-typing-over-selection-no-snarf.md) | **fixed**: any key that edits over a selection (typing, Return, Tab, Delete, Backspace, ^H ^U ^W) snarfs it to the session and clipboard first, in one undo step |
 | 27 | [Copying a whole-line selection in a terminal leaves off the final newline](../FIXED/27-term-line-copy-drops-newline.md) | **fixed**: a terminal copy through a line end takes its newline, unless the row soft-wrapped |
 | 28 | [Copying the same terminal text again doesn't put it back on the clipboard](../FIXED/28-term-copy-same-text-skips-clipboard.md) | **fixed**: a terminal copy now always writes the clipboard, sent to the copying UI as `ServerMsg::Clipboard` |
-| 29 | [The offline / "Apex quit while reopening…" screen redraws the whole window ten times a second](29-offline-screen-redraws-constantly.md) | bug: while a waiting page is up the 100 ms tick redraws the window every time, ~60% CPU instead of ~3% |
+| 29 | [The offline / "Apex quit while reopening…" screen redraws the whole window ten times a second](../FIXED/29-offline-screen-redraws-constantly.md) | **fixed**: the waiting page's spinner asks for its own frames while drawn, and the retry countdown redraws only when its second changes |
 
 Related groups: 02, 06, 07, 13, 20 (the tag's name area); 01, 10, 12, 21 (terminal
 mouse handling); 03, 16 (B1 sweeps past the edge of the text); 12, 17, 18, 19 (double-click expansion).
