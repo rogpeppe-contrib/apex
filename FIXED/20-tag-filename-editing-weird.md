@@ -141,3 +141,10 @@ often changes. The rest is fixed:
   while it is open.
 
 The fix is in the commit that contains this section.
+
+Follow-up (20b): marking on every rename also marked windows that were
+only being given their first name, so `apex new /tmp/x` (New, then the
+unnamed window named) came up dirty and `win del` refused it. Now
+`Node::set_window_path` marks only when the buffer already had a name;
+a window made with or first given a name for a file that isn't there
+starts clean, as in acme.

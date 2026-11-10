@@ -115,7 +115,7 @@ Other constructors follow the same pattern:
 | `delete_window` | Drops views, restacks or closes or unstashes, deletes the window and tag shards, and deletes the body shard with its last view |
 | `delete_column` | Fails with "column not empty" if it has windows; otherwise `rowclose`, then deletes the tag shard |
 
-Setters change a window's replicated description: `set_window_path` (renames the buffer of a text window and marks a file's changed with `mark`, as acme's `wincommit` does, or sets `WindowOp::Path`), `set_window_label`, `set_window_status` (below), and `web_navigate`, which only moves a URL page's path ([node.rs:684-743](crates/apex-core/src/node.rs#L684-L743)).
+Setters change a window's replicated description: `set_window_path` (renames the buffer of a text window and marks a file's changed with `mark` when it already had a name, as acme's `wincommit` does, or sets `WindowOp::Path`), `set_window_label`, `set_window_status` (below), and `web_navigate`, which only moves a URL page's path ([node.rs:684-743](crates/apex-core/src/node.rs#L684-L743)).
 
 Some layout helpers are used by many callers: `refit_window` re-fits a window whose tag changed shape, as acme's `winsettag` does; `uncover` brings out a column that hides a window the user is being taken to; `reveal` raises a covered window, unstashes a stashed one, un-fulls what hides it and grows a window that shows no lines. `notice` is described under [notifications](#window-flags-status-and-notifications).
 
