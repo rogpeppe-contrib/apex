@@ -20,7 +20,7 @@ and a pointer to the likely code.
 | 12 | [Double-click just before a closing bracket in a terminal doesn't match](12-double-click-before-close-paren.md) | bug |
 | 13 | [The file name in the tag can't be selected or copied](13-tag-filename-select-copy.md) | bug |
 | 14 | [Starting a daemon removes a live daemon's socket](14-daemon-removes-live-socket.md) | bug |
-| 15 | [Escape does not cut a non-empty selection](15-escape-on-selection.md) | bug |
+| 15 | [Escape does not cut a non-empty selection](../FIXED/15-escape-on-selection.md) | **fixed**: Esc cuts a non-empty selection (with snarf), so a second Esc after typing cuts the typed text |
 | 16 | [Selection autoscroll runs past the end of text and speeds up](16-selection-autoscroll-overrun.md) | bug |
 | 17 | [Double-click then drag should extend by words](17-double-click-drag-by-words.md) | feature |
 | 18 | [Triple-click should select the line; drag extends by lines](18-triple-click-drag-by-lines.md) | feature |

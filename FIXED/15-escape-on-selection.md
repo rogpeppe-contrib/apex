@@ -77,3 +77,15 @@ selected the typed text and the second left it in place:
   (with snarf) before the typed-text check.
 - The user guide (`docs/userguide.html:300`) describes Escape only as
   "select what was just typed". It would need updating along with the fix.
+
+## Fix
+
+The `"escape"` arm of `text_key` in `crates/apex-client/src/app.rs` now
+cuts a non-empty selection first, through the same `cut` helper as ⌘X
+(core `node.cut`, so it is undoable, plus the snarf buffer and the
+system clipboard), and forgets `typed_start` for the view. Only with an
+empty selection does Esc select what was typed. This is acme's order in
+`texttype`. It applies in bodies, tags and the other text views;
+terminals are unchanged, since their keys go to the program. The user
+guide and the client-input wiki page say so. The commit containing this
+section has the change.

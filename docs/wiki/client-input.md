@@ -151,7 +151,7 @@ A terminal target gets ⌘↑/⌘↓ (jump between prompt marks), ⌘⇧C (copy 
 | Delete (fn-⌫) | DEL (`\x7f`) in the body of a live window, so win interrupts; otherwise `delete_forward` |
 | Enter | A newline, plus the previous line's leading whitespace in a body when the window's `autoindent` is on. Ignored in column tags and the top row. |
 | Tab | A tab character |
-| Escape | Select what was typed since `typed_start` (acme's Esc) |
+| Escape | A non-empty selection is cut, as ⌘X does (acme's texttype cuts it before Kesc); otherwise select what was typed since `typed_start` (acme's Esc) |
 | ← / → | Move or collapse the caret |
 | Home / End | acme's Khome/Kend: bring the last insertion point (`iq1`) back into view if it has scrolled off, otherwise go to the top of the text or show its end |
 | anything with `key_char` | `type_text`: `node.insert` |
