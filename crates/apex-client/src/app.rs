@@ -505,6 +505,13 @@ pub struct Acme {
     /// B1 pressed on a folder of a tag's path or its name, and still
     /// held: B2 now is the 1-2 chord, which snarfs the path to there.
     pub head_b1: Option<(WindowId, Atom)>,
+    /// B2 pressed on a folder of a tag's path or its name, and still
+    /// held: the path runs if it comes up on the path (`release_head`),
+    /// with the selection after it if B1 went down meanwhile.
+    pub head_b2: Option<(WindowId, Atom)>,
+    /// The window whose path B2 just ran: drawn swept a moment more, as
+    /// `ran` draws text.
+    pub head_ran: Option<(WindowId, std::time::Instant)>,
     /// The process pill the pointer is on, and where it is drawn: its
     /// card goes under it (`procs.rs`).
     pub proc_hover: Option<(apex_core::Seq, gpui::Bounds<Pixels>)>,
@@ -1846,6 +1853,8 @@ impl Acme {
             picker_opened: None,
             atom_down: None,
             head_b1: None,
+            head_b2: None,
+            head_ran: None,
             proc_hover: None,
             title_marks: crate::titlefit::new_marks(),
             title_fan: None,
@@ -3012,6 +3021,12 @@ impl Acme {
             (None, Some((rv, lo, hi, at))) if rv == view => ran_fade(at.elapsed()).map(|f| (lo, hi, f)),
             _ => None,
         };
+        // a tag's path held by B2, or just run by it: swept the same way
+        let head_swept = match (view, self.head_b2, self.head_ran) {
+            (ViewId::Tag(w), Some((hw, _)), _) if hw == w => Some(1.),
+            (ViewId::Tag(w), None, Some((hw, at))) if hw == w => ran_fade(at.elapsed()),
+            _ => None,
+        };
         let hint = self.hint.and_then(|(hv, lo, hi, k)| if hv == view { Some((lo, hi, k)) } else { None });
         // a body scrolled by the pixel: moved up by its scroll into the top
         // row, and down by any pull past the start; forgotten once the
@@ -3059,6 +3074,7 @@ impl Acme {
                 origin: 0,
                 hl: None,
                 ran: None,
+                head_swept: None,
             hint: None,
                 marks: Default::default(),
                 strike: None,
@@ -3110,6 +3126,7 @@ impl Acme {
             origin: v.origin,
             hl,
             ran,
+            head_swept,
             hint,
             marks: match view {
                 ViewId::Body(w) => self.look_marks(w),
@@ -3482,6 +3499,9 @@ impl Acme {
         }
         let button = self.logical_button(e);
         self.mouse.mods = e.modifiers;
+        if button == MouseButton::Middle {
+            self.head_b2 = None;
+        }
         if self.chord(button, cx) {
             cx.notify();
             return;
@@ -3649,6 +3669,11 @@ impl Acme {
                 self.snarf_head(w, atom, cx);
                 return true;
             }
+        }
+        // B2 held on a tag's path: B1 gives it the selection, as in text
+        if self.head_b2.is_some() && button == MouseButton::Left {
+            self.mouse.chord_arg = true;
+            return true;
         }
         if let Some(d) = self.mouse.b1 {
             match button {
@@ -3897,7 +3922,7 @@ impl Acme {
         if e.button == MouseButton::Left {
             self.head_b1 = None;
         }
-        if self.release_atom(e.position, button, cx) {
+        if self.release_atom(e.position, button, cx) || self.release_head(e.position, button, cx) {
             return;
         }
         if self.mouse.scrolling.is_some_and(|(_, b, _)| b == button) {
@@ -4024,6 +4049,31 @@ impl Acme {
             MouseButton::Navigate(_) => self.menu_up(cx),
         }
         cx.notify();
+    }
+
+    /// B2 come up on the tag's path it went down on: the window's name
+    /// run, as acme's B2 on the name at the start of its tag runs it --
+    /// the whole of it from a folder too, as acme's word expands over
+    /// the `/`s -- with the selection after it for the 2-1 chord.
+    fn release_head(&mut self, pos: Point<Pixels>, button: MouseButton, cx: &mut Context<Self>) -> bool {
+        if button != MouseButton::Middle {
+            return false;
+        }
+        let Some((w, _)) = self.head_b2.take() else { return false };
+        let arg = if self.mouse.chord_arg { self.node.seltext.and_then(|v| self.node.selected_text(v).ok()) } else { None };
+        self.mouse.chord_arg = false;
+        let here = self.layouts.get(&ViewId::Tag(w)).and_then(|l| l.atom_at(pos));
+        let mut text = self.node.window_path(w);
+        if matches!(here, Some(Atom::Dir(_) | Atom::Name)) && !text.is_empty() {
+            self.head_ran = Some((w, std::time::Instant::now()));
+            if let Some(a) = arg.filter(|a| !a.is_empty()) {
+                text.push(' ');
+                text.push_str(&a);
+            }
+            self.execute(ExecCtx::Window(w), &text, cx);
+        }
+        cx.notify();
+        true
     }
 
     /// plan9port chords: while B1 is held, option cuts and command pastes.

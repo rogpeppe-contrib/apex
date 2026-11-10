@@ -2607,7 +2607,8 @@ name typed there was taken up when the pointer left (`commit_tag`).
 The client draws a tag's head from this state before the text: the path
 (its folders dim, its name strong; Untitled for a new window), the
 label on a chip, the verbs as icons, a hairline. B1 or B2 on a verb runs
-it; B3 on a folder or the name plumbs the path to there; a double-click
+it; B2 on a folder or the name runs the whole path, as acme's B2 on
+the name does; B3 on a folder or the name plumbs the path to there; a double-click
 on the path makes it a field, return renaming the window; one click on
 a folder or the name brings down a picker of that folder's entries,
 listed by the host as ^F's are, return opening one (a file or a

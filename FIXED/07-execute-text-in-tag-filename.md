@@ -79,3 +79,18 @@ output appears in the Errors toast:
   is in `13-tag-filename-select-copy.md`, and the oddities of editing
   it are in `20-tag-filename-editing-weird.md`. All three come from the
   path not being ordinary tag text.
+
+## Fix
+
+B2 pressed on a folder or the name of a tag's path now executes the
+window's whole name when it is released on the path, exactly as B2 on
+that word in acme's tag would (`Acme::press_atom` records `head_b2`;
+`Acme::release_head` in app.rs runs `execute(ExecCtx::Window(w), path)`,
+the same call B2 on tag text makes, so same cwd, +Errors and builtins).
+B1 clicked while B2 is held is the 2-1 chord: the selection is appended
+as the argument. While held, and fading after it ran, the path is
+washed in B2's sweep colour. Released off the path, nothing runs. A B2
+sweep over part of the path is not supported (the head is not text);
+the click always takes the whole name, as acme's word expansion does.
+The B1-B2 snarf chord is unchanged. The fix is in the commit containing
+this section.

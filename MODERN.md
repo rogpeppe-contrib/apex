@@ -418,7 +418,10 @@ windows put away out of the tiling, which is the core's
   path makes it a field (one click on Untitled): return renames the
   window, a relative path in the folder it was in. A double-click on
   the label edits it. B3 on a folder or the name plumbs the path to
-  there.
+  there. B2 on a folder or the name runs the whole path, as B2 on the
+  name in acme's tag runs it (the word expands over the `/`s), when it
+  comes up on the path; B1 while it is held adds the selection, the
+  2-1 chord.
 - **Columns answer as windows do.** B1 on a column's box grows it a
   little. B2 maximizes it: the others minimized where they stand, as a
   maximized window leaves the others their tags, each remembering its
