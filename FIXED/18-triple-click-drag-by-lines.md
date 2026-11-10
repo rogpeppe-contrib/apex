@@ -132,3 +132,18 @@ Taken in Apex built from the branch, on the text above.
     `term_double_click` and starts no drag.
 - See also `17-double-click-drag-by-words.md`. The two should be
   implemented together.
+
+## Fix
+
+A B1 press with `click_count >= 3` (a fourth click and on too: it stays
+at the line, as most editors do) now selects the text line under the
+pointer through its newline (`apex_core::node::triple_click`), whatever
+the wrapping, and records `Drag { base, unit: Unit::Line }`. While B1 is
+held, `node::sweep` by the line joins the base with the whole line the
+pointer is on, so the selection grows a line at a time up or down and
+never drops below the triple-clicked line; jitter can't lose it. Tags work
+the same over their text lines. Terminals select the logical line (rows
+soft-wrapped into one, `term_multi_click`) and grow by lines
+(`term_unit_sweep`). Chords and autoscroll act on the grown selection.
+The user guide and docs/wiki/client-input.md describe it. The commit is
+the one containing this section.

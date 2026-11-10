@@ -142,22 +142,42 @@ pub fn double_click(t: &Text, q: usize) -> (usize, usize) {
     (q0, q1)
 }
 
+/// A triple-click (or more): the text line `q` is on, from after the
+/// newline before it through the newline that ends it, or to the end
+/// of the text when the last line has none. A line wrapped on screen
+/// is still one line. acme has no triple-click; this is other editors'.
+pub fn triple_click(t: &Text, q: usize) -> (usize, usize) {
+    let n = t.len();
+    let (mut q0, mut q1) = (q.min(n), q.min(n));
+    while q0 > 0 && t.char_at(q0 - 1) != '\n' {
+        q0 -= 1;
+    }
+    while q1 < n && t.char_at(q1) != '\n' {
+        q1 += 1;
+    }
+    (q0, (q1 + 1).min(n))
+}
+
 /// What a B1 sweep grows by: a plain sweep by the character; one held
-/// on from a double-click by the word, as other editors and terminals
-/// do (acme's own `textselect` sweeps by the character either way).
+/// on from a double-click by the word, and from a triple-click by the
+/// line, as other editors and terminals do (acme's own `textselect`
+/// sweeps by the character either way).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Unit {
     Char,
     Word,
+    Line,
 }
 
 /// The selection a B1 sweep makes with the pointer at `p`: from `base`,
 /// what the press selected (the click point for a plain click,
-/// `double_click`'s range for a double one), out to `p` in whole
-/// `unit`s. It never shrinks below `base`: with the pointer inside it,
-/// it is `base`. By the word, the moving end goes on to the end (or
-/// back to the start) of the word `p` is inside; between words, over
-/// blanks and punctuation, it is `p` itself.
+/// `double_click`'s range for a double one, `triple_click`'s for a
+/// triple), out to `p` in whole `unit`s. It never shrinks below `base`:
+/// with the pointer inside it, it is `base`. By the word, the moving end
+/// goes on to the end (or back to the start) of the word `p` is inside;
+/// between words, over blanks and punctuation, it is `p` itself. By the
+/// line, it takes in the whole line `p` is on (just after the base's
+/// last newline is the start of the line after it).
 pub fn sweep(t: &Text, unit: Unit, base: (usize, usize), p: usize) -> (usize, usize) {
     let (b0, b1) = base;
     match unit {
@@ -165,6 +185,10 @@ pub fn sweep(t: &Text, unit: Unit, base: (usize, usize), p: usize) -> (usize, us
         Unit::Word if p > b1 => (b0, word_end(t, p)),
         Unit::Word if p < b0 => (word_start(t, p), b1),
         Unit::Word => base,
+        Unit::Line => {
+            let (l0, l1) = triple_click(t, p);
+            (b0.min(l0), b1.max(l1))
+        }
     }
 }
 
@@ -2508,6 +2532,36 @@ mod click_tests {
         // the text's ends
         assert_eq!((word_end(&t, 1000), word_start(&t, 1000)), (t.len(), t.len()));
         assert_eq!(word_start(&t, 0), 0);
+    }
+
+    #[test]
+    fn a_triple_click_selects_the_line_and_a_sweep_from_it_goes_by_lines() {
+        let t = Text::new("one two\nthree four five\n\nsix\nseven");
+        // the line and its newline, wherever on it the click is, its end too
+        for q in 0..=7 {
+            assert_eq!(triple_click(&t, q), (0, 8), "at {q}");
+        }
+        let three = triple_click(&t, 12);
+        assert_eq!(three, (8, 24));
+        // an empty line is its newline; the last line has none
+        assert_eq!(triple_click(&t, 24), (24, 25));
+        assert_eq!(triple_click(&t, 31), (29, 34));
+        assert_eq!(triple_click(&t, 1000), (29, 34));
+        assert_eq!(triple_click(&Text::new(""), 0), (0, 0));
+        // inside the line, at its end: the line
+        for p in 8..24 {
+            assert_eq!(sweep(&t, Unit::Line, three, p), three, "at {p}");
+        }
+        // down: the start of the next line is on it, as is any of it
+        assert_eq!(sweep(&t, Unit::Line, three, 24), (8, 25));
+        assert_eq!(sweep(&t, Unit::Line, three, 26), (8, 29));
+        assert_eq!(sweep(&t, Unit::Line, three, 1000), (8, 34));
+        // up: the whole line above, keeping the base
+        assert_eq!(sweep(&t, Unit::Line, three, 7), (0, 24));
+        assert_eq!(sweep(&t, Unit::Line, three, 0), (0, 24));
+        // the last line, swept up from
+        assert_eq!(sweep(&t, Unit::Line, (29, 34), 34), (29, 34));
+        assert_eq!(sweep(&t, Unit::Line, (29, 34), 27), (25, 34));
     }
 }
 

@@ -157,6 +157,16 @@ and terminals; in a terminal, a word that wraps onto the next row counts
 as one word. A drag after a single click still sweeps character by
 character.</p>
 
+<p>A B1 triple-click (which acme doesn't have) selects the whole line
+under the pointer, newline included. A line is the text up to a newline,
+not a row on the screen, so a long line that wraps is selected whole.
+Keeping B1 down after the triple-click and dragging grows the selection a
+whole line at a time, up or down, and the triple-clicked line always
+stays selected. A fourth click in a row selects the line too. This also
+works in bodies, tags and terminals; in a terminal, a line the terminal
+wrapped onto the next row counts as one line. A chord after the drag cuts
+or pastes the lines as usual.</p>
+
 <p>Chords work as in acme. While holding B1 after a sweep, click B2 to
 cut, or B3 to paste. As in acme, either chord in a file's window marks
 it changed even when there is nothing to cut or paste, so a 1-2 chord

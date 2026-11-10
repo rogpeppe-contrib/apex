@@ -23,7 +23,7 @@ and a pointer to the likely code.
 | 15 | [Escape does not cut a non-empty selection](../FIXED/15-escape-on-selection.md) | **fixed**: Esc cuts a non-empty selection (with snarf), so a second Esc after typing cuts the typed text |
 | 16 | [Selection autoscroll runs past the end of text and speeds up](../FIXED/16-selection-autoscroll-overrun.md) | **fixed**: autoscroll below a body stops once the end of the text is in view, and recrossing the edge no longer starts extra scroll loops |
 | 17 | [Double-click then drag should extend by words](../FIXED/17-double-click-drag-by-words.md) | **fixed**: a drag held on from a double-click grows the selection by whole words from what it selected, in bodies, tags and terminals |
-| 18 | [Triple-click should select the line; drag extends by lines](18-triple-click-drag-by-lines.md) | feature |
+| 18 | [Triple-click should select the line; drag extends by lines](../FIXED/18-triple-click-drag-by-lines.md) | **fixed**: a triple-click selects the whole text line, newline included, and a drag held on from it grows the selection by whole lines, in bodies, tags and terminals |
 | 19 | [Language-aware double-click selection](19-language-aware-selection.md) | feature |
 | 20 | [Editing the window's name in the tag behaves unlike editing text](../FIXED/20-tag-filename-editing-weird.md) | **fixed**: the rename field takes B1 clicks, sweeps and double-clicks, shows the path as the tag does, stays within the tag row and scrolls; any rename marks a file's window changed (breadcrumb picker kept by design) |
 | 21 | [B1-B2-B3 chord in a terminal types the selection at the prompt](../FIXED/21-term-chord-cut-paste-copies.md) | **fixed**: B3 after B2 in the same terminal sweep no longer types into the shell |
