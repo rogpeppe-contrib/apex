@@ -108,3 +108,25 @@ Long file after 1 s of holding 12 px below the edge. Left: plain drag, top line
   altogether, gave no autoscroll at all. Motion past the X window edge does not
   seem to reach the app. acme scrolls when the pointer is at or below the
   frame's bottom edge. This may be worth a separate look.
+
+## Fix
+
+- `autoscroll_step` (crates/apex-client/src/app.rs) no longer scrolls down
+  once the end of the text is in view, as acme's `framescroll` refuses to; the
+  selection still follows the pointer to the edge. The test is the new
+  `TextLayout::end_shown` (crates/apex-client/src/text_element.rs): the rows
+  laid out reach the end of the text and the last line (not counting the empty
+  one after a final newline) is wholly inside the body. Upward autoscroll
+  already stopped at the top, since `row_from` clamps at the first row.
+- Each autoscroll timer loop now carries a generation number
+  (`Acme::autoscroll_gen`, bumped whenever a fresh loop starts). A loop whose
+  generation is no longer the current one exits at its next tick, so there is
+  only ever one loop per drag, whatever the pointer does at the edge.
+- Terminals have no selection autoscroll, so neither bug applies there.
+- Not fixed: dragging out of the app window altogether gives no autoscroll.
+  The root view's handler is attached with gpui's `on_mouse_move`, which only
+  fires while the element's hitbox is hovered, so motion events outside the
+  window (which X11 does deliver during the implicit grab) never reach
+  `mouse_move`. Inside the window it works down to the last pixel row.
+
+The commit is the one containing this section.
