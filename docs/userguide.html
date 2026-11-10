@@ -341,9 +341,17 @@ and on remote machines alike.</p>
 <p>A window's path in its tag is a breadcrumb: click a folder, or the
 name, to list what is next to it, and type to narrow the list. Return
 opens the choice in a new window; ⌥Return opens it in place. Double-click
-the path to rename the window's file: the new name takes effect on
-Return or as soon as you click elsewhere, and Escape cancels; Cut, Copy
-and Paste work in the field. To copy the path, chord on it: press B1 on
+the path to rename the window's file: a field opens on the path as the
+tag shows it (from the session's directory on, when the file is in it; a
+relative name typed there is taken in that directory), and you edit it
+as text: click to place the caret, sweep with B1 to select, double-click
+a word. A long path scrolls in the field rather than running past the
+window. The new name takes effect on Return or as soon as you click
+elsewhere, and Escape cancels; Cut, Copy and Paste work in the field.
+As in acme, a file's window counts as changed once its name changes, so
+Put appears and writes the file under its new name; this holds however
+the window is renamed (the field, the chord below, <code>apex win
+rename</code> or a tool). To copy the path, chord on it: press B1 on
 the name and click B2 (or press ⌥ while B1 is held), and the whole path goes to the snarf buffer and the
 clipboard (on a folder, the path up to that folder). To rename the
 window by pasting a name, press B1 on the path and click B3 (or press ⌘

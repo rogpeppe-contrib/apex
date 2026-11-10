@@ -3747,9 +3747,13 @@ impl Acme {
         }
     }
 
-    pub fn mouse_move(&mut self, e: &MouseMoveEvent, _window: &mut Window, cx: &mut Context<Self>) {
+    pub fn mouse_move(&mut self, e: &MouseMoveEvent, window: &mut Window, cx: &mut Context<Self>) {
         let pos = e.position;
         self.last_mouse = pos;
+        // a sweep in a tag's field
+        if self.tag_edit_drag(pos, window) {
+            cx.notify();
+        }
         self.hint_mods(e.modifiers);
         if self.caret_tick() {
             cx.notify();
@@ -3930,9 +3934,7 @@ impl Acme {
         self.last_mouse = e.position;
         if e.button == MouseButton::Left {
             self.head_b1 = None;
-            if let Some(t) = self.tag_edit.as_mut() {
-                t.b1 = false;
-            }
+            self.tag_edit_release();
         }
         if self.release_atom(e.position, button, cx) || self.release_head(e.position, button, cx) {
             return;

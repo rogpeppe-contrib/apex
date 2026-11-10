@@ -105,3 +105,39 @@ The tag's own text starts after the divider; Backspace and ← stop there.
   - `tagedit.rs:~540` `tag_overlays`: the field is fixed at 420px (`min_w` is the path's width + 48), and its `on_mouse_down` only does `stop_propagation`, which is why clicks inside it are ignored.
   - `app.rs:~3486`: the second click of a double-click anywhere on the tag turns the path into a field.
   - Relative and shortened display: `Head::build_in` in `crates/apex-client/src/text_element.rs`.
+
+## Fix
+
+Steps 1, 2 and 8 (a single click opens the folder picker and typing
+filters it; the tag's keyboard can't reach the name) are the deliberate
+breadcrumb design (MODERN.md, docs/userguide.html) and are unchanged. The
+stem-selected-on-open of step 3 is kept too: it is what a rename most
+often changes. The rest is fixed:
+
+- **Mouse in the field (step 4).** B1 places the caret at the character
+  under the pointer, a B1 sweep selects, a double-click selects a word and
+  a triple-click everything. A press inside the selection keeps it until
+  B1 comes up, so the B1-B2/B1-B3 chords still cut or paste over it; a
+  click and then a chord pastes at the point.
+- **Dirty after a rename (step 5).** `Node::set_window_path` marks a
+  file's buffer changed (the replicated `marked` flag, `BufferOp::Mark`)
+  whenever it renames it, as acme's `wincommit` does, so Put appears.
+  That covers the field, the 1-3 chord on the path, `apex win rename` and
+  tools. Renaming to the same name does nothing; Put to a new name ends
+  clean (rename, then Clean).
+- **Relative names (step 6).** The field opens on the path as the tag
+  shows it (from the session's directory on), and a relative name
+  committed is resolved in that directory. A path shortened with `⋯/`
+  (not inside the session's directory) still opens in full: there is
+  nothing editable behind the ellipsis.
+- **Long paths (step 7).** The field is as wide as its text plus some
+  room, never past the tag row's right edge; past that the text is
+  clipped and scrolls to keep the caret in sight (it opens scrolled to the
+  end, so the name shows). It stays level with the tag row, and nothing
+  spills over the window behind.
+- **Covering the tag (step 3).** As a side effect, a short path's field
+  no longer covers the tag's commands (it used to be a fixed 420 px). A
+  long path's field still runs to the row's end over ×, Put and Look
+  while it is open.
+
+The fix is in the commit that contains this section.

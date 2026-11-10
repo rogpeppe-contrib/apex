@@ -25,7 +25,7 @@ and a pointer to the likely code.
 | 17 | [Double-click then drag should extend by words](17-double-click-drag-by-words.md) | feature |
 | 18 | [Triple-click should select the line; drag extends by lines](18-triple-click-drag-by-lines.md) | feature |
 | 19 | [Language-aware double-click selection](19-language-aware-selection.md) | feature |
-| 20 | [Editing the window's name in the tag behaves unlike editing text](20-tag-filename-editing-weird.md) | bug / design |
+| 20 | [Editing the window's name in the tag behaves unlike editing text](../FIXED/20-tag-filename-editing-weird.md) | **fixed**: the rename field takes B1 clicks, sweeps and double-clicks, shows the path as the tag does, stays within the tag row and scrolls; any rename marks a file's window changed (breadcrumb picker kept by design) |
 | 21 | [B1-B2-B3 chord in a terminal types the selection at the prompt](../FIXED/21-term-chord-cut-paste-copies.md) | **fixed**: B3 after B2 in the same terminal sweep no longer types into the shell |
 | 22 | [Tab-separated columns don't line up in the proportional font](../FIXED/22-tabs-misaligned.md) | **fixed**: tabs reach pixel tab stops (`tabstop` × width of '0') in any font, and `Tab n` redraws the window |
 
