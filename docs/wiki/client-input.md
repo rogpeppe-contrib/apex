@@ -55,7 +55,7 @@ There are two more ways in:
 | any | tag head atom | `press_atom`: the path, label and verbs of the tag's head. |
 | any | process pill in the session's tag (the top row's atoms) | `press_proc`. |
 | B1 | the session's own square, while a tool wants the user | `take_notification`: the oldest notification is taken and the pointer goes where it points. |
-| B1 | terminal cell | Start a client-side `term_sel`, or select a word, line or bracketed text on a double click. |
+| B1 | terminal cell | Start a client-side `term_sel`, or select a word, line or bracketed text on a double click, and set `mouse.term_drag` either way. After a double click (`mouse.term_dbl` holds the cell pressed) the expansion stands until the pointer leaves that cell; then the drag sweeps from it, as in acme's `textselect`. |
 | B2 / B3 | terminal cell | Start a `term_sweep` and draw it as `term_hl`. |
 | B1 | the top row past its text | `window.start_window_move()`, as on a title bar. |
 

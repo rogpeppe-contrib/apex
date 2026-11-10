@@ -69,3 +69,12 @@ Text window, quick click then press-and-drag from line 2 to line 5: it sweeps.
   in both cases, which is why text windows sweep. To match acme, a drag that
   moves past a small threshold after the double-click should start a sweep
   from the press point.
+
+## Fix
+
+`crates/apex-client/src/app.rs`: the terminal's B1 press now sets
+`mouse.term_drag` on a double-click too, and records the pressed cell in a new
+`mouse.term_dbl`. In `mouse_move`, while the pointer stays in that cell the
+word/line selection stands; once it leaves, the selection becomes a sweep
+anchored at the press point (and `term_dbl` is cleared), as in acme's
+`textselect`. The fix is in the commit containing this section.
