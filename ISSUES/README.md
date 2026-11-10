@@ -13,7 +13,7 @@ and a pointer to the likely code.
 | 05 | [Edit's pipe and file commands are not implemented (`Edit ,>diff $% -`)](05-edit-pipe-diff-filename.md) | feature (missing acme behaviour) |
 | 06 | [Paste chord (B1-B3) on the window's name in the tag does nothing](06-paste-chord-tag-filename.md) | bug |
 | 07 | [B2 on the window's path in the tag does nothing](07-execute-text-in-tag-filename.md) | bug |
-| 08 | [A web window's header has no Del; Ctrl+W over the page does nothing](08-cannot-delete-web-window.md) | bug |
+| 08 | [A web window's header has no Del; Ctrl+W over the page does nothing](../FIXED/08-cannot-delete-web-window.md) | **fixed**: the web header has the tag's × (Del), and Ctrl+W closes the web window over its header or its page |
 | 09 | [Button 2 in a Term window's scrollbar does nothing](../FIXED/09-term-scrollbar-middle-button.md) | **fixed**: B2 in a Term scrollbar jumps and drags, as in text windows |
 | 10 | [B3 on a soft-wrapped file name in a terminal doesn't open it](10-term-plumb-wrapped-filename.md) | bug |
 | 11 | [B1-B2 chord with null selection doesn't make the window puttable](11-chord-null-selection-put.md) | bug |

@@ -338,6 +338,17 @@ pub fn bindings() -> Vec<KeyBinding> {
     keys
 }
 
+/// Whether a key typed into a page is one of the app's shortcuts, which
+/// the page passes on rather than taking (`web::page_shortcut`): on
+/// X11 the page under the pointer has the keyboard and gpui never hears
+/// a key there. Copy, Cut, Paste, Select All, Undo and Redo stay the
+/// page's own, as a browser's are in its fields and selection.
+#[cfg(target_os = "linux")]
+pub fn app_shortcut(ks: &gpui::Keystroke) -> bool {
+    let page_own: [&dyn gpui::Action; 6] = [&Copy, &Cut, &Paste, &SelectAll, &Undo, &Redo];
+    bindings().iter().any(|b| b.match_keystrokes(std::slice::from_ref(ks)) == Some(false) && !page_own.iter().any(|a| b.action().partial_eq(*a)))
+}
+
 /// Off the Mac, a control key the text or terminal under the pointer
 /// claims (`Acme::claims_control`) goes to it before any shortcut is
 /// looked for: gpui tries the bindings first, and ^W, ^C or ^R would be
@@ -727,6 +738,18 @@ pub fn install_cli() -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_page_passes_on_the_apps_shortcuts_only() {
+        let k = |s: &str| gpui::Keystroke::parse(s).unwrap();
+        for s in ["ctrl-w", "ctrl-shift-w", "ctrl-n", "ctrl-[", "ctrl-{", "ctrl-=", "ctrl-alt-s", "ctrl-1"] {
+            assert!(app_shortcut(&k(s)), "{s}");
+        }
+        for s in ["ctrl-c", "ctrl-v", "ctrl-x", "ctrl-a", "ctrl-z", "ctrl-shift-z", "ctrl-left", "ctrl-backspace", "w", "ctrl-e"] {
+            assert!(!app_shortcut(&k(s)), "{s}");
+        }
+    }
 
     #[test]
     fn a_daemon_of_another_version_is_not_started_over() {

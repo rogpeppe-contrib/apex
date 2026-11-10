@@ -214,7 +214,8 @@ Two ways to open one:
 - `cmd | apex web [-name NAME]`: a window whose HTML comes from a
   buffer (§2.4).
 
-`Del` closes it as any window. Zerox of a web window is a second view
+`Del` closes it as any window: the × at the right of its header, or
+⌘W (^W on Linux) with the pointer over the header or the page. Zerox of a web window is a second view
 on the same URL, not a shared page.
 
 ### 2.2 Rendering
@@ -665,8 +666,10 @@ shards
   in origin form down it. The custom schemes keep their names
   (`apexfile://localhost/...` as on the Mac). Holes are the page's X
   window's SHAPE. The keys: X sends them to the window under the
-  pointer, so a page has them while the pointer is over it, ⌃C and ⌃V
-  its own, and gpui's shortcuts never come; while an overlay has the
+  pointer, so a page has them while the pointer is over it, ⌃C, ⌃V,
+  ⌃X, ⌃A, ⌃Z its own; the app's other shortcuts (⌃W, ⌃N, ⌃[ ...)
+  are taken from the WebKitGTK view before WebKit hears them and
+  dispatched to gpui as if typed there; while an overlay has the
   keys the pages take no pointer at all (an empty input shape), which
   also means no wheel in a page meanwhile. Not done: the veil over a
   page under a dialog, its rounded foot.

@@ -65,6 +65,9 @@ pub enum WebEvent {
     Scroll { top: f64, height: f64, view: f64 },
     /// The page's outline, as `TOC_SCRIPT` says it.
     Toc(String),
+    /// One of the app's shortcuts typed while the page had the keyboard
+    /// (`page_shortcut`): to be dispatched as if gpui had heard it.
+    Key(gpui::Keystroke),
 }
 
 /// The theme, as a page rendered from a buffer sees it: the editor's
@@ -1358,6 +1361,18 @@ impl Webs {
                     if (zoom - 1.).abs() > 0.01 {
                         let _ = view.zoom(zoom);
                     }
+                    // the app's shortcuts (^W and the rest) are the app's
+                    // over a page too, though the page has the keys: taken
+                    // before WebKit hears them, and passed on
+                    let (tx, wake) = (self.tx.clone(), self.wake.clone());
+                    view.webview().connect_key_press_event(move |_, e| {
+                        let Some(k) = page_shortcut(e) else { return gtk::glib::Propagation::Proceed };
+                        let _ = tx.send((w, WebEvent::Key(k)));
+                        if let Some(k) = &wake {
+                            k();
+                        }
+                        gtk::glib::Propagation::Stop
+                    });
                 }
                 let loading = if from_buffer { None } else { Some(std::time::Instant::now()) };
                 let h = WebHost { view, url, bounds: Some(bounds), shown: visible, holes: Vec::new(), html, followed: None, reloads: None, owned: None, loading, watches, plane: self.plane.clone(), scroll: None, restoring: None, toc: None, veil: None };
@@ -1825,6 +1840,35 @@ pub fn focus_ui(window: &Window) {
 /// up, `Webs::set_deaf`).
 #[cfg(not(target_os = "macos"))]
 pub fn focus_ui(_window: &Window) {}
+
+/// A key a page heard, as gpui would have it, when it is one of the
+/// app's shortcuts (`shell::app_shortcut`).
+#[cfg(target_os = "linux")]
+fn page_shortcut(e: &gtk::gdk::EventKey) -> Option<gpui::Keystroke> {
+    use gtk::gdk::ModifierType;
+    let m = e.state();
+    if !m.contains(ModifierType::CONTROL_MASK) {
+        return None;
+    }
+    let mods = gpui::Modifiers {
+        control: true,
+        alt: m.contains(ModifierType::MOD1_MASK),
+        shift: m.contains(ModifierType::SHIFT_MASK),
+        platform: m.intersects(ModifierType::SUPER_MASK | ModifierType::MOD4_MASK),
+        function: false,
+    };
+    let k = keystroke(e.keyval().to_unicode()?, mods);
+    crate::shell::app_shortcut(&k).then_some(k)
+}
+
+/// The keystroke gpui makes of character `c` typed with `mods`: the key
+/// in lower case, and shift said only for a letter (^⇧[ is `ctrl-{`), as
+/// its X11 platform says keys.
+#[cfg(target_os = "linux")]
+fn keystroke(c: char, mut mods: gpui::Modifiers) -> gpui::Keystroke {
+    mods.shift &= c.is_alphabetic();
+    gpui::Keystroke { modifiers: mods, key: c.to_lowercase().to_string(), key_char: None }
+}
 
 /// gpui's X11 window as wry takes a parent: by Xlib's handle, where gpui
 /// gives XCB's. The window is the same X window either way.
@@ -2476,6 +2520,19 @@ fn respond(responder: wry::RequestAsyncResponder, status: u16, mime: &str, body:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_key_a_page_hears_is_said_as_gpui_says_it() {
+        let ctrl_shift = gpui::Modifiers { control: true, shift: true, ..Default::default() };
+        for (c, want) in [('W', "ctrl-shift-w"), ('{', "ctrl-{"), ('|', "ctrl-|")] {
+            let k = keystroke(c, ctrl_shift);
+            let want = gpui::Keystroke::parse(want).unwrap();
+            assert_eq!((k.modifiers, k.key), (want.modifiers, want.key), "{c}");
+        }
+        assert!(crate::shell::app_shortcut(&keystroke('W', ctrl_shift)));
+        assert!(!crate::shell::app_shortcut(&keystroke('c', gpui::Modifiers::control())));
+    }
 
     #[test]
     fn a_tools_page_is_on_the_views_own_scheme_and_back() {

@@ -81,3 +81,24 @@ The whole screen:
   the page, the timer in `app.rs:1707` (`web_focus_tick`) hands the
   keyboard to the WebKit view under the pointer, and the `secondary-w`
   binding (`shell.rs:284`) never sees the key.
+
+## Fix
+
+- The web header (`webbar.rs` `web_header`) now ends with the tag's ×
+  icon (`VERB_ICONS` "Del", or the stacked variant over another
+  window), drawn with `sidebar::icon_element`; B1 or B2 on it runs
+  `Del` in the window.
+- The header records its bounds in `Acme::web_heads`, and
+  `window_at_pointer` uses them: before, no tag layout existed under the
+  header, so Ctrl+W there acted on the last selected text's window
+  (which is why step 6 sometimes appeared to work, and sometimes closed
+  a different window or did nothing).
+- Linux only: each WebKitGTK view gets a `key-press-event` handler that
+  runs before WebKit's (`web::page_shortcut`). A control key that is one
+  of the app's bindings (`shell::app_shortcut`), other than Copy, Cut,
+  Paste, Select All, Undo and Redo, is kept from the page and dispatched
+  to gpui (`WebEvent::Key`, then `Window::dispatch_keystroke` on the
+  next render). So Ctrl+W over the page is `Del`, while Ctrl+C/V/X/A/Z
+  stay the page's.
+
+The commit containing this section is the fix.
