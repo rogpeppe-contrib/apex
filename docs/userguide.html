@@ -345,7 +345,11 @@ brings it back as well.</p>
 
 <p>As in acme, typing goes to the text under the pointer, not to a
 focused window. The caret that keys will go to is drawn in the accent
-colour and blinks; other carets are plain.</p>
+colour and blinks; other carets are plain. Typing over a selection
+replaces it and, as in acme, puts the text it replaces in the snarf
+buffer (the clipboard); one Undo brings it back. Backspace, ^H, ^U and ^W
+over a selection delete it, snarfed the same way, and then erase before
+it.</p>
 <table>
 <tr><td>^U ^W ^H</td><td>erase the line, word, or character before the caret</td></tr>
 <tr><td>^A ^E</td><td>start or end of line</td></tr>

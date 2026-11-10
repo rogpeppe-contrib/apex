@@ -31,7 +31,7 @@ and a pointer to the likely code.
 | 23 | [A terminal keeps only about 1000 lines of scrollback, not Newterm.scrollback's 10000](../FIXED/23-term-scrollback-byte-cap.md) | **fixed**: the shim removes Ghostty's byte limit, so Newterm.scrollback's line count governs at every width |
 | 24 | [A B1 sweep dragged out of the app window stops following the pointer](24-sweep-outside-app-window.md) | bug: motion outside the OS window is dropped, so there is no autoscroll below it and a running autoscroll freezes at its last speed |
 | 25 | [Closing the tag's path picker leaves the tag several lines tall](25-tag-tall-after-picker-escape.md) | bug: after Escape closes a long path's picker, the tag keeps its picking height until the next redraw |
-| 26 | [Typing over a selection does not put the replaced text in the snarf buffer](26-typing-over-selection-no-snarf.md) | bug: typing, Return, Tab or Delete over a selection replaces it without snarfing, unlike acme |
+| 26 | [Typing over a selection does not put the replaced text in the snarf buffer](../FIXED/26-typing-over-selection-no-snarf.md) | **fixed**: any key that edits over a selection (typing, Return, Tab, Delete, Backspace, ^H ^U ^W) snarfs it to the session and clipboard first, in one undo step |
 | 27 | [Copying a whole-line selection in a terminal leaves off the final newline](27-term-line-copy-drops-newline.md) | bug: terminal line selections (triple-click, line drag) copy without their last newline |
 
 Related groups: 02, 06, 07, 13, 20 (the tag's name area); 01, 10, 12, 21 (terminal

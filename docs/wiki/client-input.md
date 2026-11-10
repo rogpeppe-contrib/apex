@@ -139,7 +139,7 @@ As in plan9port's devdraw, a tap of ⌥ alone starts a compose sequence (`"o` ö
 
 ### `text_key`
 
-`text_key` follows acme's `texttype`. Each key becomes a node operation:
+`text_key` follows acme's `texttype`. Each key becomes a node operation. As in acme, every key that edits (^U ^W ^H, Backspace, Delete, Enter, Tab, other ^letters and typed characters, all but Escape through `type_text` or `node.erase`/`delete_forward`) first snarfs a non-empty selection with `Acme::snarf`, to the session's snarf and the system clipboard, and the edit then deletes it in the key's typing group, so one Undo brings the selection back. `Acme::cut` is not used there, since `node.cut` starts a new undo group:
 
 | Key | Effect |
 |---|---|

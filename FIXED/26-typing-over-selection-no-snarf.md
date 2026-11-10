@@ -153,3 +153,16 @@ separate call.
   and Esc now already does it.
 - Related: issue 15 (FIXED/15-escape-on-selection.md, commit f3efb23), whose
   commit message notes this gap.
+
+## Fix
+
+`Acme::text_key` (crates/apex-client/src/app.rs) now calls `Acme::snarf`
+(session snarf plus system clipboard) before each editing key: `type_text`
+does it for typed characters, Return, Tab, control letters and DEL in a live
+body, and the ^U/^W/^H, Backspace and Delete arms do it before
+`node.erase`/`node.delete_forward`. The edit itself still deletes the
+selection in the typing group, so one Undo restores the replaced text and
+its selection (verified: `node.cut` would have started a new group, needing
+two Undos). `Node::erase` no longer appends its own `LayoutOp::Snarf`. Esc
+keeps f3efb23's cut. ^F/Insert (completion) still doesn't snarf. Terminals
+are unchanged. The fix is in the commit that moved this file into FIXED/.
