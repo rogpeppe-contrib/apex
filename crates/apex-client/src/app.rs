@@ -93,6 +93,9 @@ struct Mouse {
     autoscroll: Option<(ViewId, i64)>,
     /// B1 held in a terminal: the selection follows the pointer.
     term_drag: Option<WindowId>,
+    /// The terminal sweep has copied (B2): the B3 after it is acme's
+    /// paste back of what was cut, which leaves the shell alone.
+    term_copied: bool,
     /// B3 went down with shift: the Look runs backwards.
     b3_reverse: bool,
     /// B3 with command held: `Def` at the pointer (with shift, `Back`).
@@ -3576,6 +3579,7 @@ impl Acme {
                             let p = (c, top + r as u64);
                             self.term_sel = Some((w, p, p));
                             self.mouse.term_drag = Some(w);
+                            self.mouse.term_copied = false;
                         }
                     }
                     self.node.activecol = self.column_of_view(ViewId::Tag(w));
@@ -3623,13 +3627,17 @@ impl Acme {
                 // B1+B2 in a terminal: copy (there is nothing to cut)
                 MouseButton::Middle => {
                     self.mouse.chorded = true;
+                    self.mouse.term_copied = true;
                     self.term_copy(w, cx);
                     return true;
                 }
-                // B1+B3 in a terminal: the clipboard typed into the shell
+                // B1+B3 in a terminal: the clipboard typed into the shell,
+                // unless B2 copied first: 1-2-3, acme's copy, only copies
                 MouseButton::Right => {
                     self.mouse.chorded = true;
-                    self.term_paste_clipboard(w, cx);
+                    if !self.mouse.term_copied {
+                        self.term_paste_clipboard(w, cx);
+                    }
                     return true;
                 }
                 _ => {}
@@ -3979,11 +3987,14 @@ impl Acme {
             // in a terminal: option copies (nothing to cut), command pastes
             if e.modifiers.alt && !prev.alt {
                 self.mouse.chorded = true;
+                self.mouse.term_copied = true;
                 self.term_copy(w, cx);
                 cx.notify();
             } else if e.modifiers.platform && !prev.platform {
                 self.mouse.chorded = true;
-                self.term_paste_clipboard(w, cx);
+                if !self.mouse.term_copied {
+                    self.term_paste_clipboard(w, cx);
+                }
                 cx.notify();
             }
             return;

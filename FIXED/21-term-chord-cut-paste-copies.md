@@ -69,3 +69,12 @@ After B1-B3 sweeping `gamma`: the snarf buffer (`seq 1 5`) is typed at the promp
   whether the other has already happened in the same chord. One fix:
   when B3 follows B2 in the same B1 hold (`mouse.chorded` is already
   set by the copy), treat it as a no-op, or make it copy too.
+
+## Fix
+
+`chord` in `crates/apex-client/src/app.rs` now remembers, per terminal
+sweep, that B2 has copied (`Mouse::term_copied`, cleared when B1 starts
+a terminal sweep). A B3 after that in the same sweep does nothing, so
+1-2-3 only copies; B1-B2 and B1-B3 alone behave as before. The laptop
+equivalent (⌥ then ⌘ while sweeping) follows the same rule. The commit
+containing this section has the change.

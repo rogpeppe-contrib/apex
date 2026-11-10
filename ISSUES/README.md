@@ -26,7 +26,7 @@ and a pointer to the likely code.
 | 18 | [Triple-click should select the line; drag extends by lines](18-triple-click-drag-by-lines.md) | feature |
 | 19 | [Language-aware double-click selection](19-language-aware-selection.md) | feature |
 | 20 | [Editing the window's name in the tag behaves unlike editing text](20-tag-filename-editing-weird.md) | bug / design |
-| 21 | [B1-B2-B3 chord in a terminal types the selection at the prompt](21-term-chord-cut-paste-copies.md) | bug |
+| 21 | [B1-B2-B3 chord in a terminal types the selection at the prompt](../FIXED/21-term-chord-cut-paste-copies.md) | **fixed**: B3 after B2 in the same terminal sweep no longer types into the shell |
 | 22 | [Tab-separated columns don't line up in the proportional font](22-tabs-misaligned.md) | bug |
 
 Related groups: 02, 06, 07, 13, 20 (the tag's name area); 01, 10, 12, 21 (terminal

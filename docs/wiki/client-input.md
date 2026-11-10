@@ -61,7 +61,7 @@ There are two more ways in:
 
 `BoxTarget` also has `Edge` and `WinEdge` variants for the lines between columns and between windows. On release they move the edge only if the pointer travelled at least two pixels.
 
-The `Mouse` struct holds all of this per-gesture state: the three drags, `chorded`, `chord_arg`, `wheel_rest` (the wheel's unscrolled fraction of a line), `box_drag`, `scrolling`, `autoscroll`, `term_drag`, `term_sweep`, `b3_reverse`, `b3_cmd`, `left_as` and the modifiers ([app.rs:77-105](crates/apex-client/src/app.rs#L77-L105)).
+The `Mouse` struct holds all of this per-gesture state: the three drags, `chorded`, `chord_arg`, `wheel_rest` (the wheel's unscrolled fraction of a line), `box_drag`, `scrolling`, `autoscroll`, `term_drag`, `term_copied`, `term_sweep`, `b3_reverse`, `b3_cmd`, `left_as` and the modifiers ([app.rs:77-105](crates/apex-client/src/app.rs#L77-L105)).
 
 ### Sweeps
 
@@ -71,9 +71,9 @@ B2 and B3 sweeps are not selections. They only set `self.hl = (view, lo, hi, HlK
 
 ### Chords
 
-`chord` runs on every press, before `locate`. While B1 is down, B2 cuts and B3 pastes in the view where the B1 sweep started, wherever the pointer has gone since. In a terminal, B2 copies (there is nothing to cut) and B3 types the clipboard into the shell. Setting `chorded` freezes the sweep. A press that lands outside the window still reaches `chord` through `mouse_down_out` ([app.rs:3577-3633](crates/apex-client/src/app.rs#L3577-L3633)).
+`chord` runs on every press, before `locate`. While B1 is down, B2 cuts and B3 pastes in the view where the B1 sweep started, wherever the pointer has gone since. In a terminal, B2 copies (there is nothing to cut) and B3 types the clipboard into the shell, unless B2 already copied in the same sweep (`term_copied`): 1-2-3, acme's copy idiom, then only copies. Setting `chorded` freezes the sweep. A press that lands outside the window still reaches `chord` through `mouse_down_out` ([app.rs:3577-3633](crates/apex-client/src/app.rs#L3577-L3633)).
 
-On a laptop there are no extra buttons to chord with, so `modifiers_changed` does the same job. Pressing ⌥ while B1 is held cuts, and pressing ⌘ pastes (in a terminal, ⌥ copies and ⌘ pastes the clipboard). `modifiers_changed` also refreshes the ⌘/⌥ hint, ends the ctrl-tab walk when control is let go, and stops gpui hiding the pointer while control is down ([app.rs:3930-3985](crates/apex-client/src/app.rs#L3930-L3985)). Cut and paste use the system clipboard as acme's snarf buffer. A paste also appends `LayoutOp::Snarf` so that the session's snarf matches the clipboard.
+On a laptop there are no extra buttons to chord with, so `modifiers_changed` does the same job. Pressing ⌥ while B1 is held cuts, and pressing ⌘ pastes (in a terminal, ⌥ copies and ⌘ pastes the clipboard, except after ⌥ in the same sweep). `modifiers_changed` also refreshes the ⌘/⌥ hint, ends the ctrl-tab walk when control is let go, and stops gpui hiding the pointer while control is down ([app.rs:3930-3985](crates/apex-client/src/app.rs#L3930-L3985)). Cut and paste use the system clipboard as acme's snarf buffer. A paste also appends `LayoutOp::Snarf` so that the session's snarf matches the clipboard.
 
 ### Release: what B2 runs and what B3 looks at
 
