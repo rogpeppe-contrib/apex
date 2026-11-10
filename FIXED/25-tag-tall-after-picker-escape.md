@@ -114,3 +114,17 @@ off it, an external rename) would have the same lag.
   978645d), which uses the same picker.
 - Blinking hides most of it (at most ~0.5 s). With View ▸ Blink Cursor off it
   is easy to see.
+
+## Fix
+
+`TextElement::prepaint` (crates/apex-client/src/text_element.rs) now compares
+the row count it records in `acme.tag_need` with the one already there, and
+when it differs (or the tag is new) calls `window.request_animation_frame()`.
+The next frame's `Acme::measure` then sees the new count and its `refit` pass
+resizes the slot, so the tag's height catches up one frame after its text, as
+`picker_anchor`/`completion_anchor` already do. It can't loop: once the count
+is unchanged no frame is requested (checked under Xephyr: idle CPU after
+closing the picker is the same as before the change). This covers every way a
+tag's wrap changes without a second frame following: Escape, Enter or a click
+off the picker, `apex win tag`, a rename. The fix is in the commit that moved
+this file into FIXED/.
