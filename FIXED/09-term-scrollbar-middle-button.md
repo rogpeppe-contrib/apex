@@ -64,3 +64,18 @@ jumped to the end of the listing as expected:
   (`app.rs:4915`, `dir == 0` branch) and `scroll_step` (which maps
   `Middle` to `dir 0`). It just never runs. Text views (`app.rs:3551`) and web
   views have the Middle arm.
+
+## Fix
+
+The Term mouse-down dispatch in `crates/apex-client/src/app.rs` now has a
+`(Region::TermScrollbar, MouseButton::Middle)` arm that calls
+`start_scrolling`, as the B1 and B3 arms do. The existing `dir == 0` branch of
+`term_scrollbar_click` then does the positioning, and holding B2 follows the
+pointer through the shared `scroll_step` repeat loop, as in text windows. The
+fix is in the commit that contains this section.
+
+Note: the bar spans the history the terminal has kept, not everything ever
+printed. In the GUI check, after `seq 1 2000` the oldest kept line was about
+1063 (with `Newterm.scrollback` at its default of 10000 lines, so something
+keeps less history than that setting says; not looked into here). So B2 a
+quarter of the way down showed about line 1300, not line 500.
