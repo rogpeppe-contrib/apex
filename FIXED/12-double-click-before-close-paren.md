@@ -102,3 +102,18 @@ In a text window, a double-click just before each closer works:
   closing sides alike. acme ignores motion of less than 3px after a
   double-click (text.c, `textselect`), keeping the double-click
   selection.
+
+## Fix
+
+A terminal double-click now expands from the boundary between cells
+nearest the pointer (new `TermLayout::boundary_at` in
+`crates/apex-client/src/term_element.rs`, rounding x to the nearest cell
+edge), not from the start of the cell under it, as text windows do with
+`offset_at`. Only the double-click's expansion point changed: single
+click, sweeps, B2/B3 and the drag after a double-click (which still
+remembers the pressed cell in `Mouse::term_dbl`) use cells as before.
+New unit test `a_double_click_just_inside_either_bracket_selects_what_they_enclose`
+in `app.rs`. The commit is the one containing this section.
+
+The note about text windows losing the double-click selection on 1px
+motion is issue 17.

@@ -17,7 +17,7 @@ and a pointer to the likely code.
 | 09 | [Button 2 in a Term window's scrollbar does nothing](../FIXED/09-term-scrollbar-middle-button.md) | **fixed**: B2 in a Term scrollbar jumps and drags, as in text windows |
 | 10 | [B3 on a soft-wrapped file name in a terminal doesn't open it](10-term-plumb-wrapped-filename.md) | bug |
 | 11 | [B1-B2 chord with null selection doesn't make the window puttable](11-chord-null-selection-put.md) | bug |
-| 12 | [Double-click just before a closing bracket in a terminal doesn't match](12-double-click-before-close-paren.md) | bug |
+| 12 | [Double-click just before a closing bracket in a terminal doesn't match](../FIXED/12-double-click-before-close-paren.md) | **fixed**: a terminal double-click expands from the character boundary nearest the pointer, as in text windows |
 | 13 | [The file name in the tag can't be selected or copied](13-tag-filename-select-copy.md) | bug |
 | 14 | [Starting a daemon removes a live daemon's socket](14-daemon-removes-live-socket.md) | bug |
 | 15 | [Escape does not cut a non-empty selection](../FIXED/15-escape-on-selection.md) | **fixed**: Esc cuts a non-empty selection (with snarf), so a second Esc after typing cuts the typed text |
